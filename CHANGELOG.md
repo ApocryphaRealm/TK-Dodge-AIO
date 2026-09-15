@@ -11,3 +11,6 @@ TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE 
   modifiers), perk lock, on-dodge spell, attack cancel with light-only and MCO recovery-window options, i-frame duration.
 - Settings in `TK Dodge AIO.ini` and on an Apocrypha Menu Framework page.
 - Main-loop hook mapped to SE (35565 + 0x731); vtable hooks on SprintHandler, SneakHandler and PlayerCharacter::Update.
+
+### Added
+- First SE build: TK Dodge RE + TK Dodge RE Addon features in one SKSE plugin (TK_Dodge_RE.dll) on CommonLibSSE-NG for Skyrim SE 1.5.97, settings on an Apocrypha Menu Framework page and in TK Dodge AIO.ini; main-loop hook mapped to SE 35565+0x731.
