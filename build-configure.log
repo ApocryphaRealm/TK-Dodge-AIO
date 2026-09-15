@@ -1,0 +1,93 @@
+﻿cmd.exe : 'vswhere.exe' is not recognized as an internal or external command,
+At line:1 char:390
++ ... ralPath $R; & cmd.exe /c "`"$R\configure.bat`"" *> "$R\build-configur ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ('vswhere.exe' i...ternal command,:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+operable program or batch file.
+-- Running vcpkg install
+Fetching registry information from https://github.com/microsoft/vcpkg (HEAD)...
+Detecting compiler hash for triplet x64-windows...
+Compiler found: C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe
+Detecting compiler hash for triplet x64-windows-static-md...
+Compiler found: C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe
+The following packages will be built and installed:
+    commonlibsse-ng:x64-windows-static-md@4.0.0#1 -- D:/Claude output/6. current wip mods/TK-Dodge-AIO/cmake/ports/commonlibsse-ng
+  * directxmath:x64-windows-static-md@2024-02-14#1 -- git+https://github.com/microsoft/vcpkg@785a609b10fad1343aea267a513e8bbd49334fb0
+  * directxtk:x64-windows-static-md@2024-02-21 -- git+https://github.com/microsoft/vcpkg@24e95ab84a5104d0554179573df839a45ee52b24
+  * fmt:x64-windows-static-md@10.2.1#1 -- git+https://github.com/microsoft/vcpkg@74cfe848ded3d9610b11e442aa6b2341cfa65b1b
+  * rapidcsv:x64-windows-static-md@8.64 -- git+https://github.com/microsoft/vcpkg@1842f5ea6077feea4ef5d07bb43e2fd648763718
+    spdlog:x64-windows-static-md@1.13.0 -- git+https://github.com/microsoft/vcpkg@8ee97c0faf23e06508ca097e013e2bea40579d06
+  * vcpkg-cmake:x64-windows@2023-05-04 -- git+https://github.com/microsoft/vcpkg@88a7058fc7fa73a9c4c99cfcae9d79e2abf87a5a
+  * vcpkg-cmake-config:x64-windows@2022-02-06#1 -- git+https://github.com/microsoft/vcpkg@8d54cc4f487d51b655abec5f9c9c3f86ca83311f
+  * xbyak:x64-windows-static-md@6.73 -- git+https://github.com/microsoft/vcpkg@c72f02ee8e100020f33b6f409cbabeca9fe8b0aa
+Additional packages (*) will be modified to complete this operation.
+Restored 9 package(s) from D:\vcpkg-binary-cache in 5.2 s. Use --debug to see more details.
+Installing 1/9 vcpkg-cmake-config:x64-windows@2022-02-06#1...
+vcpkg-cmake-config:x64-windows@2022-02-06#1 package ABI: 868946cb0c4b1afe93969ef5723b600847a420620af339a74e3c7420cc1ad97b
+Elapsed time to handle vcpkg-cmake-config:x64-windows: 54.2 ms
+Installing 2/9 vcpkg-cmake:x64-windows@2023-05-04...
+vcpkg-cmake:x64-windows@2023-05-04 package ABI: e19fdb4efb9557fbab6c7375cfcb6cc9f58c69b2ba32042c5c720dc29ea08558
+Elapsed time to handle vcpkg-cmake:x64-windows: 77 ms
+Installing 3/9 xbyak:x64-windows-static-md@6.73...
+xbyak:x64-windows-static-md@6.73 package ABI: 32c18d42bbd2cdd50d51e0bdc83fd324a8dcf7369ae3cbf52f711bf5c872728a
+Elapsed time to handle xbyak:x64-windows-static-md: 77.7 ms
+Installing 4/9 fmt:x64-windows-static-md@10.2.1#1...
+fmt:x64-windows-static-md@10.2.1#1 package ABI: 1016e0c72eec7fdc7addfd32900946b10a254a8fc9941c4f861d4504603629cd
+Elapsed time to handle fmt:x64-windows-static-md: 156 ms
+Installing 5/9 spdlog:x64-windows-static-md@1.13.0...
+spdlog:x64-windows-static-md@1.13.0 package ABI: 6515b539cc9a3224172f2f79534f50539670e951ad93859219c8c382fd340b03
+Elapsed time to handle spdlog:x64-windows-static-md: 157 ms
+Installing 6/9 rapidcsv:x64-windows-static-md@8.64...
+rapidcsv:x64-windows-static-md@8.64 package ABI: 93fba4c3b3c1ba09ad8fd769b5ecff8fe5f41c457801f19ca61266ec68e2eefe
+Elapsed time to handle rapidcsv:x64-windows-static-md: 28.5 ms
+Installing 7/9 directxmath:x64-windows-static-md@2024-02-14#1...
+directxmath:x64-windows-static-md@2024-02-14#1 package ABI: 5d5d71d3766174628247c886ed17ef5bef71dfea69bf95fa096f022438dfcf57
+Elapsed time to handle directxmath:x64-windows-static-md: 140 ms
+Installing 8/9 directxtk:x64-windows-static-md@2024-02-21...
+directxtk:x64-windows-static-md@2024-02-21 package ABI: 246e9e0e1ee38a9b5d44a1bbc5bffc8a70b045c1e93909e6701de389a75bdab8
+Elapsed time to handle directxtk:x64-windows-static-md: 153 ms
+Installing 9/9 commonlibsse-ng:x64-windows-static-md@4.0.0#1...
+commonlibsse-ng:x64-windows-static-md@4.0.0#1 package ABI: 960db50680e88f9d4b0cced3eab196338255052a8e94702cbf6e2f9c2ae1dc25
+Elapsed time to handle commonlibsse-ng:x64-windows-static-md: 351 ms
+Installed contents are licensed to you by owners. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages.
+Packages installed in this vcpkg installation declare the following licenses:
+BSD-3-Clause
+MIT
+The package spdlog provides CMake targets:
+
+    find_package(spdlog CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE spdlog::spdlog)
+
+    # Or use the header-only version
+    find_package(spdlog CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE spdlog::spdlog_header_only)
+
+commonlibsse-ng provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(CommonLibSSE CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE CommonLibSSE::CommonLibSSE)
+
+All requested installations completed successfully in: 1.2 s
+-- Running vcpkg install - done
+-- The CXX compiler identification is MSVC 19.51.36256.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+Parsing commonlibsse_plugin_version 1.0.0
+Setting major version to 1
+Parsing ADD_COMMONLIBSSE_PLUGIN_MINIMUM_SKSE_VERSION 0
+-- Configuring done (25.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: D:/Claude output/6. current wip mods/TK-Dodge-AIO/build/relwithdebinfo-se-only

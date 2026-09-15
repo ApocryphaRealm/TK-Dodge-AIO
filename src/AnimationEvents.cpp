@@ -1,5 +1,6 @@
 #include "AnimationEvents.h"
 #include "dodging.h"
+#include "utils/Logger.h"
 
 constexpr uint32_t hash_djb2(const char* data, const size_t size) noexcept
 {
@@ -31,8 +32,7 @@ RE::BSEventNotifyControl animEventHandler::HookedProcessEvent(RE::BSAnimationGra
 {
     const FnProcessEvent fn = fnHash.at(*reinterpret_cast<uint64_t*>(this));
 
-    REX::DEBUG(" Event {} recieved", a_event.tag.data());
-    REX::DEBUG(" Payload {} recieved", a_event.payload.c_str());
+    logger::trace("Animation event {} (payload {})", a_event.tag.c_str(), a_event.payload.c_str());
 
     const auto player = RE::PlayerCharacter::GetSingleton();
 

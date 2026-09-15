@@ -2,7 +2,7 @@
 
 namespace RE
 {
-	using PerkEntryPoint = BGSPerkEntry::EntryPoint;
+	using PerkEntryPoint = BGSEntryPoint::ENTRY_POINT;
 }
 
 namespace PEPE
@@ -146,7 +146,7 @@ namespace PerkEntryPointExtenderAPI
 		HINSTANCE API = GetModuleHandleW(L"PerkEntryPointExtender.dll");
 
 		if (API == nullptr) {
-			REX::CRITICAL("PerkEntryPointExtender.dll not found, API will remain non functional.");
+			SKSE::log::critical("PerkEntryPointExtender.dll not found, API will remain non functional.");
 			return nullptr;
 		}
 
@@ -154,11 +154,11 @@ namespace PerkEntryPointExtenderAPI
 
 		if (request_interface) {
 			if (static unsigned int once = 0; once++)
-				REX::INFO("Successful module and request, PEPE");
+				SKSE::log::info("Successful module and request, PEPE");
 
 		}
 		else {
-			REX::CRITICAL("Unsuccessful module and request, PEPE");
+			SKSE::log::critical("Unsuccessful module and request, PEPE");
 			return nullptr;
 		}
 

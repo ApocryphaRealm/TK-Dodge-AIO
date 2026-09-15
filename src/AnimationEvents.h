@@ -35,16 +35,16 @@ public:
     static void Register(const bool player, const bool NPC)
     {
         if (player) {
-            REX::DEBUG("Sinking animation event hook for player");
+            logger::debug("Sinking animation event hook for player");
             const REL::Relocation pcPtr{ RE::VTABLE_PlayerCharacter[2] };
             HookSink(pcPtr.address());
         }
         if (NPC) {
-            REX::DEBUG("Sinking animation event hook for NPC");
+            logger::debug("Sinking animation event hook for NPC");
             const REL::Relocation npcPtr{ RE::VTABLE_Character[2] };
             HookSink(npcPtr.address());
         }
-        REX::DEBUG("Sinking complete.");
+        logger::debug("Sinking complete.");
     }
 
     static void RegisterForPlayer() { Register(true, false); }

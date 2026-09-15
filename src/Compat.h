@@ -1,0 +1,118 @@
+#pragma once
+
+// Replacements for the handful of StyyxUtils helpers the Addon used (StyyxUtils is GPL-3.0 by Styyx;
+// ApplySpell/IsPermanent credited there to KernalsEgg, from colinswrath's Blade and Blunt). Rewritten for
+// CommonLibSSE-NG, which the SE port builds on instead of the AE-only CommonLib fork StyyxUtils targets.
+
+#include "utils/Logger.h"
+
+namespace Compat
+{
+	// "Plugin.esp|0x800" (local form ID in hex) or an EditorID (needs po3's Tweaks to resolve most types).
+	inline RE::TESForm* GetFormFromString(const std::string& a_text)
+	{
+		if (a_text.empty()) {
+			return nullptr;
+		}
+		if (const auto bar = a_text.find('|'); bar != std::string::npos) {
+			const std::string plugin = a_text.substr(0, bar);
+			const std::string id = a_text.substr(bar + 1);
+			if (plugin.empty() || id.empty()) {
+				logger::warn("Form string \"{}\" is missing its plugin or its form ID", a_text);
+				return nullptr;
+			}
+			RE::FormID local = 0;
+			try {
+				local = static_cast<RE::FormID>(std::stoul(id, nullptr, 16));
+			} catch (...) {
+				logger::warn("Form string \"{}\": \"{}\" is not a hex form ID", a_text, id);
+				return nullptr;
+			}
+			auto* dh = RE::TESDataHandler::GetSingleton();
+			if (!dh) {
+				logger::warn("TESDataHandler is not ready; cannot resolve \"{}\"", a_text);
+				return nullptr;
+			}
+			return dh->LookupForm(local, plugin);
+		}
+		return RE::TESForm::LookupByEditorID(a_text);
+	}
+
+	inline bool IsModLoaded(std::string_view a_modName)
+	{
+		auto* dh = RE::TESDataHandler::GetSingleton();
+		if (!dh) {
+			return false;
+		}
+		const auto* file = dh->LookupModByName(a_modName);
+		return file && file->compileIndex != 0xFF;
+	}
+
+	inline bool IsAnyOfMenuOpen(const std::vector<std::string>& a_menuNames)
+	{
+		auto* ui = RE::UI::GetSingleton();
+		if (!ui) {
+			return true;  // no UI yet means no gameplay either - treat as "in a menu" so nothing fires
+		}
+		for (const auto& name : a_menuNames) {
+			if (ui->IsMenuOpen(name)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	inline RE::ActorValue LookupActorValueByName(std::string_view a_name)
+	{
+		auto* list = RE::ActorValueList::GetSingleton();
+		return list ? list->LookupActorValueByName(a_name) : RE::ActorValue::kNone;
+	}
+
+	inline bool IsPermanent(RE::MagicItem* a_item)
+	{
+		switch (a_item->GetSpellType()) {
+		case RE::MagicSystem::SpellType::kDisease:
+		case RE::MagicSystem::SpellType::kAbility:
+		case RE::MagicSystem::SpellType::kAddiction:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	// Adds a permanent spell (ability/disease/addiction); casts anything else from the caster at the target.
+	inline void ApplySpell(RE::Actor* a_caster, RE::Actor* a_target, RE::SpellItem* a_spell)
+	{
+		if (!a_caster || !a_target || !a_spell) {
+			return;
+		}
+		if (IsPermanent(a_spell)) {
+			a_target->AddSpell(a_spell);
+			return;
+		}
+		if (auto* caster = a_caster->GetMagicCaster(RE::MagicSystem::CastingSource::kInstant)) {
+			caster->CastSpellImmediate(a_spell, false, a_target, 1.0F, false, 0.0F, nullptr);
+		} else {
+			logger::warn("{} has no instant magic caster; the on-dodge spell was not cast", a_caster->GetName());
+		}
+	}
+
+	// NG for SE has no Actor::IsPowerAttacking: read the current attack's data from the high process.
+	inline bool IsPowerAttacking(const RE::Actor* a_actor)
+	{
+		if (!a_actor) {
+			return false;
+		}
+		const auto* process = a_actor->GetActorRuntimeData().currentProcess;
+		if (!process || !process->high) {
+			return false;
+		}
+		const auto& attackData = process->high->attackData;
+		return attackData && attackData->data.flags.all(RE::AttackData::AttackFlag::kPowerAttack);
+	}
+
+	inline bool IsPlayer(const RE::Actor* a_actor)
+	{
+		return a_actor && a_actor == RE::PlayerCharacter::GetSingleton();
+	}
+}

@@ -1,9 +1,3 @@
-[submodule "extern/styyx-utils"]
-	path = extern/styyx-utils
-	url = https://github.com/Styyx1/StyyxUtils
-[submodule "lib/commonlibsse"]
-	path = lib/commonlibsse
-	url = https://github.com/libxse/commonlibsse.git
 [submodule "extern/clib-util"]
 	path = extern/clib-util
 	url = https://github.com/powerof3/CLibUtil

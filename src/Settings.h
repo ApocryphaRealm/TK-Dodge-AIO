@@ -1,120 +1,97 @@
 #pragma once
-#include "REX/REX/TOML.h"
+
+// TK Dodge AIO settings. The Addon kept these in REX::TOML (tk-dodge.toml + tk-dodge_custom.toml), which
+// the SE CommonLibSSE-NG does not have; they now live in Data\SKSE\Plugins\TK Dodge AIO.ini under the SAME
+// key names, read and written with plain file I/O (never the Win32 profile API - rule 16). Each value keeps
+// the Addon's GetValue()/SetValue() shape so the dodge logic reads exactly as it did.
+
 #include "mod-data.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace Config
 {
-struct Settings : public REX::Singleton<Settings>, MOD
-{
-    inline static REX::TOML::Bool enable_sneak_key_dodge{SECTION_SETTINGS, "bEndableSneakKeyDodge", false};
-    inline static REX::TOML::Bool enable_dodge_in_place{SECTION_SETTINGS, "bEnableDodgeInPlace", false};
-    inline static REX::TOML::Bool step_dodge{SECTION_SETTINGS, "bStepDodge", false};
-    inline static REX::TOML::Bool enable_sneak_dodge{SECTION_SETTINGS, "bEnableSneakDodge", false};
-    inline static REX::TOML::Bool enable_dodge_attack_cancel{SECTION_SETTINGS, "bEnableDodgeAttackCancel", true};
-    inline static REX::TOML::Bool only_cancel_light{SECTION_SETTINGS, "bOnlyCancelLightAttacks", false};
-    inline static REX::TOML::F32 i_frame_duration{SECTION_SETTINGS, "fIFrameDuration", 0.3f};
-    inline static REX::TOML::Str default_dodge_event{SECTION_SETTINGS, "sDefaultDodgeEvent",
-                                                     std::string("TKDodgeBack")};
-    inline static REX::TOML::F32 sprinting_press_duration{SECTION_SETTINGS, "fSprintingPressDuration", 0.3f};
-    inline static REX::TOML::F32 sneaking_press_duration{SECTION_SETTINGS, "fSneakingPressDuration", 0.3f};
+	template <class T>
+	struct Value
+	{
+		const char* section;
+		const char* key;
+		T           current;
+		T           def;
 
-    inline static REX::TOML::Bool use_double_tap{SECTION_SETTINGS, "bUseDoubleTap", true};
-    inline static REX::TOML::Bool disable_in_third{SECTION_SETTINGS, "bDisableInThird", false};
+		Value(const char* a_section, const char* a_key, T a_default) :
+			section(a_section), key(a_key), current(a_default), def(a_default)
+		{}
 
+		[[nodiscard]] T GetValue() const { return current; }
+		void            SetValue(T a_value) { current = a_value; }
+		void            Reset() { current = def; }
+	};
 
-    inline static REX::TOML::F32 dodge_cost{SECTION_SETTINGS, "fDodgeCost", 15.0f};
-    inline static REX::TOML::U32 dodge_key{SECTION_SETTINGS, "uDodgeKey", static_cast<std::uint32_t>(274)};
-    inline static REX::TOML::Bool use_sprint_key{SECTION_SETTINGS, "bUseSprintKey", false};
-    inline static REX::TOML::Bool use_mco_recover_window{SECTION_SETTINGS, "bUseMCORecoverWindow", false};
+	struct Settings : MOD
+	{
+		// [Settings]
+		inline static Value<bool>        enable_sneak_key_dodge{ "Settings", "bEnableSneakKeyDodge", false };
+		inline static Value<bool>        enable_dodge_in_place{ "Settings", "bEnableDodgeInPlace", true };
+		inline static Value<bool>        step_dodge{ "Settings", "bStepDodge", false };
+		inline static Value<bool>        enable_sneak_dodge{ "Settings", "bEnableSneakDodge", false };
+		inline static Value<bool>        enable_dodge_attack_cancel{ "Settings", "bEnableDodgeAttackCancel", true };
+		inline static Value<bool>        only_cancel_light{ "Settings", "bOnlyCancelLightAttacks", false };
+		inline static Value<float>       i_frame_duration{ "Settings", "fIFrameDuration", 0.3F };
+		inline static Value<std::string> default_dodge_event{ "Settings", "sDefaultDodgeEvent", std::string("TKDodgeBack") };
+		inline static Value<float>       sprinting_press_duration{ "Settings", "fSprintingPressDuration", 0.5F };
+		inline static Value<float>       sneaking_press_duration{ "Settings", "fSneakingPressDuration", 0.5F };
+		inline static Value<bool>        use_double_tap{ "Settings", "bUseDoubleTap", false };
+		inline static Value<bool>        disable_in_third{ "Settings", "bDisableInThird", false };
+		inline static Value<float>       dodge_cost{ "Settings", "fDodgeCost", 15.0F };
+		// Keyboard Left Shift (DirectInput 42), TK Dodge's classic default. SKSE key-code space: 0-255 keyboard,
+		// 256+ mouse, 266+ gamepad. 1 = unbound.
+		inline static Value<std::uint32_t> dodge_key{ "Settings", "uDodgeKey", 42u };
+		inline static Value<bool>        use_sprint_key{ "Settings", "bUseSprintKey", false };
+		inline static Value<bool>        use_mco_recover_window{ "Settings", "bUseMCORecoverWindow", false };
+		inline static Value<bool>        use_perk_lock{ "Settings", "bUsePerkLock", false };
+		inline static Value<bool>        use_percentage_cost{ "Settings", "bUsePercentageCost", false };
+		inline static Value<bool>        remove_forward{ "Settings", "bRemoveForwardDodge", false };
 
-    inline static REX::TOML::Bool use_perk_lock{SECTION_SETTINGS, "bUsePerkLock", false};
-    inline static REX::TOML::Bool use_percentage_cost{SECTION_SETTINGS, "bUsePercentageCost", false};
-    inline static REX::TOML::Bool remove_forward{SECTION_SETTINGS, "bRemoveForwardDodge", true};
+		// [Forms]
+		inline static Value<std::string> dodge_perk_ID{ "Forms", "sDodgeRequiredPerkID", std::string("TKDodgeAddon.esp|0x809") };
+		inline static Value<std::string> on_dodge_spell_ID{ "Forms", "sOnDodgeSpellID", std::string("OnDodgeDummySpell") };
+		inline static Value<std::string> on_dodge_spell_perk_ID{ "Forms", "sOnDodgeSpellRequiredPerkID", std::string("TKDodgeAddon.esp|0x80F") };
 
-    inline static REX::TOML::Str dodge_perk_ID{SECTION_FORMS, "sDodgeRequiredPerkID",
-                                               std::string("TKDodgeAddon.esp|0x809")};
-    inline static REX::TOML::Str on_dodge_spell_ID{SECTION_FORMS, "sOnDodgeSpellID", std::string("OnDodgeDummySpell")};
-    inline static REX::TOML::Str on_dodge_spell_perk_ID{SECTION_FORMS, "sOnDodgeSpellRequiredPerkID",
-                                                        std::string("TKDodgeAddon.esp|0x80F")};
+		// [Debug]
+		inline static Value<std::uint32_t> log_level{ "Debug", "uLogLevel", 0u };  // 0 = trace (project default)
 
-    static void UpdateSettings(const bool a_save) noexcept
-    {
-        const auto toml = REX::TOML::SettingStore::GetSingleton();
-        toml->Init(TOML_PATH_DEFAULT.data(), TOML_PATH_CUSTOM.data());
-        if (!a_save)
-            toml->Load();
+		// Reads the INI (a missing file keeps the compiled defaults). a_save=true writes every value back instead,
+		// replacing each key in place so comments and unknown keys survive. Kept as one function to match the
+		// Addon's UpdateSettings(bool) call sites.
+		static bool UpdateSettings(bool a_save) noexcept;
+		static void RestoreDefaults() noexcept;
+		static void ApplyLogLevel() noexcept;
+		static const std::string& IniPath() noexcept;
+	};
 
-        else
-            toml->Save();
-    }
-};
-struct Forms : REX::Singleton<Forms>, MOD
-{
+	struct Forms : MOD
+	{
+		inline static RE::SpellItem* dummyDodgeSpell = nullptr;
+		inline static RE::BGSPerk*   DodgePerkDummy = nullptr;
+		inline static RE::BGSPerk*   dummySpellLockPerk = nullptr;
+		inline static RE::SpellItem* onDodgeSpell = nullptr;
+		inline static RE::BGSPerk*   SpellLockPerk = nullptr;
+		inline static RE::BGSPerk*   ActualDodgePerk = nullptr;
+		inline static RE::TESGlobal* TDMGlobal = nullptr;
 
-    inline static RE::SpellItem* dummyDodgeSpell;
-    inline static RE::BGSPerk* DodgePerkDummy;
-    inline static RE::BGSPerk* dummySpellLockPerk;
+		inline static const std::vector<std::string> MenuNames{
+			std::string(RE::BarterMenu::MENU_NAME),    std::string(RE::BookMenu::MENU_NAME),     std::string(RE::Console::MENU_NAME),
+			std::string(RE::ContainerMenu::MENU_NAME), std::string(RE::CraftingMenu::MENU_NAME), std::string(RE::DialogueMenu::MENU_NAME),
+			std::string(RE::FavoritesMenu::MENU_NAME), std::string(RE::GiftMenu::MENU_NAME),     std::string(RE::InventoryMenu::MENU_NAME),
+			std::string(RE::JournalMenu::MENU_NAME),   std::string(RE::LevelUpMenu::MENU_NAME),  std::string(RE::LockpickingMenu::MENU_NAME),
+			std::string(RE::MagicMenu::MENU_NAME),     std::string(RE::MapMenu::MENU_NAME),      std::string(RE::RaceSexMenu::MENU_NAME),
+			std::string(RE::SleepWaitMenu::MENU_NAME), std::string(RE::StatsMenu::MENU_NAME),    std::string(RE::TrainingMenu::MENU_NAME),
+			std::string(RE::TutorialMenu::MENU_NAME),  std::string(RE::TweenMenu::MENU_NAME),
+		};
 
-    inline static RE::SpellItem* onDodgeSpell;
-    inline static RE::BGSPerk* SpellLockPerk;
-    inline static RE::BGSPerk* ActualDodgePerk;
-
-    inline static RE::TESGlobal* TDMGlobal;
-
-    static constexpr std::array slMenuNames{
-        RE::BarterMenu::MENU_NAME,    RE::BookMenu::MENU_NAME,     RE::Console::MENU_NAME,
-        RE::ContainerMenu::MENU_NAME, RE::CraftingMenu::MENU_NAME, RE::DialogueMenu::MENU_NAME,
-        RE::FavoritesMenu::MENU_NAME, RE::GiftMenu::MENU_NAME,     RE::InventoryMenu::MENU_NAME,
-        RE::JournalMenu::MENU_NAME,   RE::LevelUpMenu::MENU_NAME,  RE::LockpickingMenu::MENU_NAME,
-        RE::MagicMenu::MENU_NAME,     RE::MapMenu::MENU_NAME,      RE::RaceSexMenu::MENU_NAME,
-        RE::SleepWaitMenu::MENU_NAME, RE::StatsMenu::MENU_NAME,    RE::TrainingMenu::MENU_NAME,
-        RE::TutorialMenu::MENU_NAME,  RE::TweenMenu::MENU_NAME,
-    };
-    std::vector<std::string> MenuNames{slMenuNames.begin(), slMenuNames.end()};
-
-    static void LoadForms() noexcept
-    {
-        RE::TESDataHandler* const dh = RE::TESDataHandler::GetSingleton();
-
-        if (!MiscUtil::IsModLoaded(MOD_NAME))
-        {
-            REX::FAIL("Can not load forms from {}, please enable the mod first", MOD_NAME);
-            return;
-        }
-
-        dummyDodgeSpell    = dh->LookupForm<RE::SpellItem>(DUMMY_DODGE_SPELL_FORMID, MOD_NAME);
-        DodgePerkDummy     = dh->LookupForm<RE::BGSPerk>(DODGE_PERK_DUMMY_FORMID, MOD_NAME);
-        dummySpellLockPerk = dh->LookupForm<RE::BGSPerk>(DUMMY_SPELL_LOCK_PERK_FORMID, MOD_NAME);
-
-        // Load Dynamic Forms
-        if (!Settings::dodge_perk_ID.GetValue().empty())
-        {
-            RE::TESForm* form = FormUtil::GetFormFromString(Settings::dodge_perk_ID.GetValue());
-            ActualDodgePerk   = form ? form->As<RE::BGSPerk>() : nullptr;
-            if (!ActualDodgePerk)
-                REX::ERROR("Dodge perk lookup failed, please check your config file");
-            else
-                REX::INFO("Dodge perk is: {}", ActualDodgePerk->GetName());
-        }
-        if (!Settings::on_dodge_spell_perk_ID.GetValue().empty())
-        {
-            RE::TESForm* form = FormUtil::GetFormFromString(Settings::on_dodge_spell_perk_ID.GetValue());
-            SpellLockPerk     = form ? form->As<RE::BGSPerk>() : nullptr;
-            if (!SpellLockPerk)
-                REX::ERROR("Spell Lock perk lookup failed, please check your config file");
-            else
-                REX::INFO("Spell lock is: {}", SpellLockPerk->GetName());
-        }
-        if (!Settings::on_dodge_spell_ID.GetValue().empty())
-        {
-            RE::TESForm* form = FormUtil::GetFormFromString(Settings::on_dodge_spell_ID.GetValue());
-            onDodgeSpell      = form ? form->As<RE::SpellItem>() : nullptr;
-            if (!onDodgeSpell)
-                REX::ERROR("On Dodge spell lookup failed, please check your config file");
-            else
-                REX::INFO("OnDodge Spell is: {}", onDodgeSpell->GetName());
-        }
-        TDMGlobal = RE::TESForm::LookupByEditorID<RE::TESGlobal>("TDM_DirectionalMovement");
-    };
-};
-} // namespace Config
+		static void LoadForms() noexcept;
+	};
+}

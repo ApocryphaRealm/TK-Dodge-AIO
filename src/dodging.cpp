@@ -1,9 +1,8 @@
 #include "dodging.h"
+#include "Compat.h"
+#include "utils/Logger.h"
 
 #include "API/PerkEntryPointExtenderAPI.h"
-#include "RE/H/HUDObject.h"
-#include "RE/P/PlayerCamera.h"
-#include "RE/P/PlayerCharacter.h"
 #include "Settings.h"
 #include "Utility.h"
 #include "mod-data.h"
@@ -60,7 +59,7 @@ bool CanDodge(RE::Actor* a_actor)
     {
         return true;
     }
-    REX::DEBUG("Dodge failed because of: {}", DodgeResultToString(result));
+    logger::debug("Dodge failed because of: {}", DodgeResultToString(result));
 
     return false;
 }
@@ -116,7 +115,7 @@ bool IsInMCORecovery(const RE::Actor* a_actor)
 
 float CalculateDodgeCost(RE::Actor* a_actor)
 {
-    if (const bool is_player_god_mod = a_actor->IsPlayerRef() && RE::PlayerCharacter::IsGodMode(); is_player_god_mod)
+    if (const bool is_player_god_mod = Compat::IsPlayer(a_actor) && RE::PlayerCharacter::IsGodMode(); is_player_god_mod)
     {
         return 0.0;
     }
@@ -124,22 +123,22 @@ float CalculateDodgeCost(RE::Actor* a_actor)
     float dodgeCostModifier = 1.0;
     float extraDodgeCostMod = 1.0;
 
-    const auto cost_modifierAV  = AVUtil::LookupActorValueByName(MOD::USED_AV.data());
-    const auto stag_cost_mod_AV = AVUtil::LookupActorValueByName(MOD::EXTRA_DODGE_AV.data());
+    const auto cost_modifierAV  = Compat::LookupActorValueByName(MOD::USED_AV);
+    const auto stag_cost_mod_AV = Compat::LookupActorValueByName(MOD::EXTRA_DODGE_AV);
 
     if (cost_modifierAV != RE::ActorValue::kNone)
     {
-        dodgeCostModifier = a_actor->GetActorValue(cost_modifierAV);
+        dodgeCostModifier = a_actor->AsActorValueOwner()->GetActorValue(cost_modifierAV);
     }
     if (stag_cost_mod_AV != RE::ActorValue::kNone)
     {
-        extraDodgeCostMod = a_actor->GetActorValue(stag_cost_mod_AV);
+        extraDodgeCostMod = a_actor->AsActorValueOwner()->GetActorValue(stag_cost_mod_AV);
     }
     float dodge_cost = Config::Settings::dodge_cost.GetValue();
     float cost       = dodge_cost;
     if (Config::Settings::use_percentage_cost.GetValue())
     {
-        const auto max_stam = a_actor->GetBaseActorValue(RE::ActorValue::kStamina);
+        const auto max_stam = a_actor->AsActorValueOwner()->GetBaseActorValue(RE::ActorValue::kStamina);
         cost                = ((max_stam / 100) * dodge_cost) * dodgeCostModifier * extraDodgeCostMod;
     }
     else
@@ -149,20 +148,21 @@ float CalculateDodgeCost(RE::Actor* a_actor)
     RE::TESForm* armo = a_actor->GetWornArmor(RE::BGSBipedObjectForm::BipedObjectSlot::kBody, true);
 
     RE::HandleEntryPoint(RE::PerkEntryPoint::kModPowerAttackStamina, a_actor, cost, MOD::DODGE_COST_PERK, armo);
-    REX::DEBUG("Dodge Cost after is {}", cost);
+    logger::debug("Dodge Cost after is {}", cost);
 
     return cost;
 }
 
 void ApplyDodgeCostActor(RE::Actor* a_actor)
 {
-    if (a_actor->IsPlayerRef() && RE::PlayerCharacter::IsGodMode())
+    if (Compat::IsPlayer(a_actor) && RE::PlayerCharacter::IsGodMode())
         return;
 
     float dodgeCost = CalculateDodgeCost(a_actor);
-    REX::DEBUG("Dodge Cost first is {}", dodgeCost);
+    logger::debug("Dodge Cost first is {}", dodgeCost);
 
-    a_actor->DamageActorValue(RE::ActorValue::kStamina, -dodgeCost);
+    a_actor->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kStamina, -dodgeCost);
+    logger::debug("Dodge cost {} applied to {}", dodgeCost, a_actor->GetName());
 }
 
 DodgeEventResult GetDodgeEvent(std::string& a_event)
@@ -176,7 +176,7 @@ DodgeEventResult GetDodgeEvent(std::string& a_event)
     if (Config::Forms::TDMGlobal && Config::Forms::TDMGlobal->Is(RE::FormType::Global) &&
         Config::Forms::TDMGlobal->value != 0)
     {
-        REX::DEBUG("TDM Free Movement, Force to Forward Dodge!");
+        logger::debug("TDM Free Movement, Force to Forward Dodge!");
         a_event = "TKDodgeForward";
     }
     else
@@ -230,7 +230,7 @@ void CastOnDodgeSpell(RE::Actor* a_actor)
 
     if (a_actor && lockPerk && dodgeSpell && a_actor->HasPerk(lockPerk))
     {
-        MagicUtil::ApplySpell(a_actor, a_actor, dodgeSpell);
+        Compat::ApplySpell(a_actor, a_actor, dodgeSpell);
     }
 }
 
@@ -243,7 +243,7 @@ bool CanAttackCancel(const RE::Actor* a_actor)
     {
         if (only_light_cancel)
         {
-            return !a_actor->IsPowerAttacking();
+            return !Compat::IsPowerAttacking(a_actor);
         }
         return IsInMCORecovery(a_actor);
     }
@@ -252,7 +252,7 @@ bool CanAttackCancel(const RE::Actor* a_actor)
 
 DodgeResult IsInAttackState(const RE::Actor* a_actor)
 {
-    if (const auto attackState = a_actor->GetAttackState();
+    if (const auto attackState = a_actor->AsActorState()->GetAttackState();
         attackState == RE::ATTACK_STATE_ENUM::kNone || CanAttackCancel(a_actor))
     {
         return DodgeResult::kSuccess;
@@ -262,7 +262,7 @@ DodgeResult IsInAttackState(const RE::Actor* a_actor)
 
 DodgeResult IsSprinting(const RE::Actor* a_actor)
 {
-    if (!a_actor->IsSprinting())
+    if (!a_actor->AsActorState()->IsSprinting())
     {
         return DodgeResult::kSuccess;
     }
@@ -279,7 +279,7 @@ DodgeResult IsSneaking(const RE::Actor* a_actor)
 }
 DodgeResult IsSwimming(const RE::Actor* a_actor)
 {
-    if (!a_actor->IsSwimming())
+    if (!a_actor->AsActorState()->IsSwimming())
     {
         return DodgeResult::kSuccess;
     }
@@ -297,7 +297,7 @@ DodgeResult IsInKillMove(const RE::Actor* a_actor)
 
 bool IsInGodModeHelper(const RE::Actor* a_actor)
 {
-    if (a_actor->IsPlayerRef() && RE::PlayerCharacter::IsGodMode())
+    if (Compat::IsPlayer(a_actor) && RE::PlayerCharacter::IsGodMode())
     {
         return true;
     }
@@ -306,7 +306,7 @@ bool IsInGodModeHelper(const RE::Actor* a_actor)
 
 DodgeResult IsInMenu(const RE::Actor* a_actor)
 {
-    if (!a_actor->IsPlayerRef())
+    if (!Compat::IsPlayer(a_actor))
     {
         return DodgeResult::kSuccess;
     }
@@ -320,7 +320,7 @@ DodgeResult IsInMenu(const RE::Actor* a_actor)
 
 DodgeResult IsControlsDisabled(const RE::Actor* a_actor)
 {
-    if (!a_actor->IsPlayerRef())
+    if (!Compat::IsPlayer(a_actor))
     {
         return DodgeResult::kSuccess;
     }
@@ -337,14 +337,14 @@ DodgeResult IsControlsDisabled(const RE::Actor* a_actor)
 
 DodgeResult IsInWrongState(const RE::Actor* a_actor)
 {
-    if (Config::Settings::disable_in_third.GetValue() && a_actor->IsPlayerRef() &&
+    if (Config::Settings::disable_in_third.GetValue() && Compat::IsPlayer(a_actor) &&
         RE::PlayerCamera::GetSingleton()->IsInThirdPerson())
     {
         return DodgeResult::kIsInWrongState;
     }
 
-    if (a_actor->GetSitSleepState() == RE::SIT_SLEEP_STATE::kNormal &&
-        a_actor->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal && a_actor->GetFlyState() == RE::FLY_STATE::kNone)
+    if (a_actor->AsActorState()->GetSitSleepState() == RE::SIT_SLEEP_STATE::kNormal &&
+        a_actor->AsActorState()->GetKnockState() == RE::KNOCK_STATE_ENUM::kNormal && a_actor->AsActorState()->GetFlyState() == RE::FLY_STATE::kNone)
     {
         return DodgeResult::kSuccess;
     }
@@ -357,7 +357,7 @@ DodgeResult HasStamina(RE::Actor* a_actor)
     {
         return DodgeResult::kSuccess;
     }
-    if (a_actor->GetActorValue(RE::ActorValue::kStamina) >= CalculateDodgeCost(a_actor))
+    if (a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina) >= CalculateDodgeCost(a_actor))
     {
         return DodgeResult::kSuccess;
     }
@@ -440,7 +440,7 @@ bool DoDodge(RE::Actor* a_actor)
 {
     if (!CanDodge(a_actor))
     {
-        REX::DEBUG("cannot dodge");
+        logger::debug("cannot dodge");
         return false;
     }
 
@@ -455,13 +455,13 @@ bool DoDodge(RE::Actor* a_actor)
 
     if (Config::Settings::step_dodge.GetValue())
     {
-        REX::DEBUG("step dodge bool is {}", Config::Settings::step_dodge.GetValue());
-        REX::DEBUG("step dodge active");
+        logger::debug("step dodge bool is {}", Config::Settings::step_dodge.GetValue());
+        logger::debug("step dodge active");
         a_actor->SetGraphVariableInt("iStep", 2);
     }
     else
         a_actor->SetGraphVariableInt("iStep", 0);
-    REX::DEBUG("step dodge bool is {}", Config::Settings::step_dodge.GetValue());
+    logger::debug("step dodge bool is {}", Config::Settings::step_dodge.GetValue());
 
     CastOnDodgeSpell(a_actor);
     float iFrames = Config::Settings::i_frame_duration.GetValue();

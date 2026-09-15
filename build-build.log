@@ -1,0 +1,12 @@
+'vswhere.exe' is not recognized as an internal or external command,
+operable program or batch file.
+[0/2] Re-checking globbed directories...
+[1/6] Building CXX object CMakeFiles\TKDodgeAIO.dir\src\InputEvents.cpp.obj
+cl : Command line warning D9025 : overriding '/DENABLE_SKYRIM_VR=1' with '/UENABLE_SKYRIM_VR'
+[2/6] Building CXX object CMakeFiles\TKDodgeAIO.dir\src\Hooks.cpp.obj
+cl : Command line warning D9025 : overriding '/DENABLE_SKYRIM_VR=1' with '/UENABLE_SKYRIM_VR'
+[3/6] Building CXX object CMakeFiles\TKDodgeAIO.dir\src\dodging.cpp.obj
+cl : Command line warning D9025 : overriding '/DENABLE_SKYRIM_VR=1' with '/UENABLE_SKYRIM_VR'
+[4/6] Building CXX object CMakeFiles\TKDodgeAIO.dir\src\Settings.cpp.obj
+cl : Command line warning D9025 : overriding '/DENABLE_SKYRIM_VR=1' with '/UENABLE_SKYRIM_VR'
+[5/6] Linking CXX shared library TK_Dodge_RE.dll

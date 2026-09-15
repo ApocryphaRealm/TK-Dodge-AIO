@@ -1,5 +1,6 @@
 #pragma once
-#include <Settings.h>
+#include "Settings.h"
+#include "Compat.h"
 
 #define PI 3.14159265f
 #define PI8 0.39269908f
@@ -56,7 +57,7 @@ namespace Utility
 
     inline bool IsInMenu()
     {
-        return MiscUtil::IsAnyOfMenuOpen(RE::UI::GetSingleton(), Config::Forms::GetSingleton()->MenuNames);
+        return Compat::IsAnyOfMenuOpen(Config::Forms::MenuNames);
     }
 
 };
