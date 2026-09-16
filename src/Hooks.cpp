@@ -1,5 +1,6 @@
 #include "Hooks.h"
 
+#include "Compat.h"
 #include "Settings.h"
 #include "Utility.h"
 #include "dodging.h"
@@ -21,7 +22,13 @@ namespace Hooks
 					bStoppingSprint = true;  // this press ends a sprint rather than starting a dodge
 				} else if (a_event->HeldDuration() < Config::Settings::sprinting_press_duration.GetValue()) {
 					if (a_event->IsUp()) {
-						if (!Utility::IsInMenu()) {
+						// ... and not in the moment just after a menu closed. The press that LEAVES a menu is
+						// handed to gameplay with the menu already shut, so IsInMenu is false by then and the tap
+						// read as a dodge. The dodge-key sink was guarded for this in 1.0.1; this path - a tap of
+						// the SPRINT key, which is how the owner actually dodges - was not, so the guard appeared
+						// to do nothing (the owner, 2026-09-16: "TK dodges guard against dodging out of the quest
+						// journal menu did not work").
+						if (!Utility::IsInMenu() && !Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
 							logger::debug("Sprint key tapped ({:.2f}s) - dodge input", a_event->HeldDuration());
 							Dodge::OnInput();
 						}
@@ -48,7 +55,8 @@ namespace Hooks
 					bStopSneak = true;
 				} else if (a_event->HeldDuration() < Config::Settings::sneaking_press_duration.GetValue()) {
 					if (a_event->IsUp()) {
-						if (!Utility::IsInMenu()) {
+						// Same guard as the sprint path above: a tap that closed a menu is not a dodge.
+						if (!Utility::IsInMenu() && !Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
 							logger::debug("Sneak key tapped ({:.2f}s) - dodge input", a_event->HeldDuration());
 							Dodge::OnInput();
 						}
