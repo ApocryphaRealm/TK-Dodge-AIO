@@ -3,6 +3,11 @@
 TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE Addon 3.1.5-era source by Styyx
 (upstream numbering is not continued).
 
+## 1.0.1 - 2026-09-16 - untested
+
+### Fixed
+- **No dodge on the press that closes a menu** (the owner, 2026-09-16: *"we need to add to tk dodge that you dont dodge when exiting out of a menu - it currently dodges when exiting the journal but not the system tab"*). The dodge sink already ignored a press made WHILE a menu is open, but that check cannot catch the press that closes one: the game hands it to gameplay in the same breath as the close, by which point the menu is no longer open and the press reads as an ordinary dodge. Whether it slipped through came down to how many frames the close took - which is exactly why leaving the journal dodged and leaving from its System tab, a frame slower, did not. A `MenuOpenCloseEvent` sink now remembers when one of the watched menus closed, and a dodge press within `fMenuExitGrace` seconds of that (default 0.25, 0 turns the guard off) is ignored. Only the menus a dodge is already blocked inside are watched, so closing something unrelated cannot eat a dodge, and the span is measured on the steady clock because the game clock stops in menus.
+
 ## 1.0.0 - 2026-09-15 - untested
 
 ### Added

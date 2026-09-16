@@ -17,6 +17,7 @@ namespace
 		case SKSE::MessagingInterface::kInputLoaded:
 			logger::debug("kInputLoaded: registering the dodge key listener");
 			Events::InputEvent::GetSingleton()->RegisterInput();
+			Events::MenuEvent::GetSingleton()->RegisterMenus();
 			break;
 		case SKSE::MessagingInterface::kDataLoaded:
 			logger::debug("kDataLoaded: animation-event sink, forms, strings, settings page");

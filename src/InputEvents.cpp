@@ -6,6 +6,8 @@
 #include "ui.h"
 #include "utils/Logger.h"
 
+#include <algorithm>
+
 namespace Events
 {
 	std::uint32_t KeyCodeOf(const RE::ButtonEvent* a_button)
@@ -34,6 +36,32 @@ namespace Events
 		}
 	}
 
+	void MenuEvent::RegisterMenus()
+	{
+		if (const auto ui = RE::UI::GetSingleton()) {
+			ui->AddEventSink<RE::MenuOpenCloseEvent>(this);
+			logger::info("Input: watching menu closes, so the press that leaves a menu is not taken for a dodge");
+		} else {
+			logger::error("Input: the UI singleton is null; a dodge can still fire on the press that closes a menu");
+		}
+	}
+
+	EventResult MenuEvent::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
+	{
+		if (!a_event || a_event->opening) {
+			return EventResult::kContinue;
+		}
+		// Only the menus a dodge is already blocked inside - closing an unrelated HUD-ish menu should not eat a dodge.
+		const auto& watched = Config::Forms::MenuNames;
+		const std::string name(a_event->menuName.c_str() ? a_event->menuName.c_str() : "");
+		if (std::find(watched.begin(), watched.end(), name) == watched.end()) {
+			return EventResult::kContinue;
+		}
+		Compat::NoteMenuClosed();
+		logger::trace("Menu \"{}\" closed; dodge presses ignored for {:.2f}s", name, Config::Settings::menu_exit_grace.GetValue());
+		return EventResult::kContinue;
+	}
+
 	EventResult InputEvent::ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>*)
 	{
 		if (!a_event) {
@@ -56,6 +84,13 @@ namespace Events
 			}
 			if (Utility::IsInMenu()) {
 				logger::trace("Dodge key {} pressed in a menu - ignored", id);
+				continue;
+			}
+			// And for a moment AFTER a menu closes. The press that closes a menu reaches gameplay in the same breath
+			// as the close, with the menu already shut, so the open check above cannot see it - which is why exiting
+			// the journal dodged while exiting from its System tab, a frame slower, did not.
+			if (Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
+				logger::trace("Dodge key {} pressed just after a menu closed - ignored", id);
 				continue;
 			}
 			logger::debug("Dodge key {} pressed", id);

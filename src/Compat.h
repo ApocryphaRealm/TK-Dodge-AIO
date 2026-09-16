@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+
+#include <atomic>
+
 // Replacements for the handful of StyyxUtils helpers the Addon used (StyyxUtils is GPL-3.0 by Styyx;
 // ApplySpell/IsPermanent credited there to KernalsEgg, from colinswrath's Blade and Blunt). Rewritten for
 // CommonLibSSE-NG, which the SE port builds on instead of the AE-only CommonLib fork StyyxUtils targets.
@@ -46,6 +50,34 @@ namespace Compat
 		}
 		const auto* file = dh->LookupModByName(a_modName);
 		return file && file->compileIndex != 0xFF;
+	}
+
+	// The moment a watched menu last closed, and the test that goes with it.
+	//
+	// A menu-open check alone cannot stop a dodge on the way OUT of a menu. The press that closes the menu is handed
+	// to gameplay in the same breath as the close, and by the time the dodge sink sees it the menu is already shut,
+	// so it reads as an ordinary dodge press. Whether that happens at all depends on how many frames the close takes
+	// - which is why the journal dodged and its System tab, one frame slower, did not.
+	//
+	// So the close is remembered, and presses are ignored for a short while afterwards. Steady clock: the game clock
+	// stops in menus, which is exactly the span being measured.
+	inline std::atomic<std::chrono::steady_clock::time_point> g_menuClosedAt{ std::chrono::steady_clock::time_point{} };
+
+	inline void NoteMenuClosed()
+	{
+		g_menuClosedAt.store(std::chrono::steady_clock::now(), std::memory_order_release);
+	}
+
+	inline bool WithinMenuExitGrace(float a_seconds)
+	{
+		if (a_seconds <= 0.0F) {
+			return false;
+		}
+		const auto closed = g_menuClosedAt.load(std::memory_order_acquire);
+		if (closed == std::chrono::steady_clock::time_point{}) {
+			return false;
+		}
+		return std::chrono::duration<float>(std::chrono::steady_clock::now() - closed).count() < a_seconds;
 	}
 
 	inline bool IsAnyOfMenuOpen(const std::vector<std::string>& a_menuNames)

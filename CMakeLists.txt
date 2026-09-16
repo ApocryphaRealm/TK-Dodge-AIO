@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.21)
+﻿cmake_minimum_required(VERSION 3.21)
 
 # TK Dodge AIO - all-in-one TK Dodge for Skyrim SE 1.5.97 (and AE through CommonLibSSE-NG).
 # Fork of Styyx's TK Dodge RE Addon (GPL-3.0), itself built on Maxsu's TK Dodge RE (MIT), ported
 # from xmake + an AE-only CommonLib fork to CMake + vcpkg CommonLibSSE-NG.
 project(
 	TKDodgeAIO
-	VERSION 1.0.0
+	VERSION 1.0.1
 	LANGUAGES CXX
 )
 

@@ -54,6 +54,14 @@ namespace Config
 		inline static Value<bool>        use_perk_lock{ "Settings", "bUsePerkLock", false };
 		inline static Value<bool>        use_percentage_cost{ "Settings", "bUsePercentageCost", false };
 		inline static Value<bool>        remove_forward{ "Settings", "bRemoveForwardDodge", false };
+		// How long after a menu CLOSES a dodge key press is ignored, in seconds.
+		//
+		// The menu-open check is not enough on its own: the press that closes a menu is delivered to gameplay in the
+		// same breath as the close, by which point the menu is no longer open and the press reads as a plain dodge.
+		// That is why exiting the journal dodged (the owner, 2026-09-16: "you dont dodge when exiting out of a menu -
+		// it currently dodges when exiting the journal but not the system tab") while exiting from the System tab,
+		// which closes a frame later, did not. 0 turns the guard off.
+		inline static Value<float>       menu_exit_grace{ "Settings", "fMenuExitGrace", 0.25F };
 
 		// [Forms]
 		inline static Value<std::string> dodge_perk_ID{ "Forms", "sDodgeRequiredPerkID", std::string("TKDodgeAddon.esp|0x809") };
