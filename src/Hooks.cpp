@@ -8,6 +8,20 @@
 
 namespace Hooks
 {
+	// Did this press BEGIN inside a menu?
+	//
+	// The time grace was the wrong instrument. It assumed the press that closes a menu reaches gameplay within a
+	// fixed window of the close, and that holds for the System tab but not for Quest Journal Overhaul, whose
+	// journal takes longer to go (the owner, 2026-09-16: "TK Dodge still dodges when leaving the journal menu,
+	// and you should probably note that the Quest journal overhaul is different than the regular system tab
+	// menu. So it still doesn't dodge when exiting the system tab").
+	//
+	// Whether a press started in a menu is not a guess and does not depend on how long anything takes: a tap
+	// fires the dodge on RELEASE, so if the matching press went down while a menu was open, that tap belongs to
+	// the menu it closed and never to a dodge - however slowly the menu got around to closing.
+	static bool bSprintPressBeganInMenu = false;
+	static bool bSneakPressBeganInMenu = false;
+
 	static bool bStoppingSprint = false;
 	static bool bStopSneak = false;
 
@@ -18,6 +32,9 @@ namespace Hooks
 			const auto userEvents = RE::UserEvents::GetSingleton();
 			if (player && userEvents && a_event->QUserEvent() == userEvents->sprint) {
 				const bool sprinting = player->GetPlayerRuntimeData().playerFlags.isSprinting;
+				if (a_event->IsDown()) {
+					bSprintPressBeganInMenu = Utility::IsInMenu();
+				}
 				if (a_event->IsDown() && sprinting) {
 					bStoppingSprint = true;  // this press ends a sprint rather than starting a dodge
 				} else if (a_event->HeldDuration() < Config::Settings::sprinting_press_duration.GetValue()) {
@@ -28,10 +45,14 @@ namespace Hooks
 						// the SPRINT key, which is how the owner actually dodges - was not, so the guard appeared
 						// to do nothing (the owner, 2026-09-16: "TK dodges guard against dodging out of the quest
 						// journal menu did not work").
-						if (!Utility::IsInMenu() && !Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
+						if (!Utility::IsInMenu() && !bSprintPressBeganInMenu &&
+							!Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
 							logger::debug("Sprint key tapped ({:.2f}s) - dodge input", a_event->HeldDuration());
 							Dodge::OnInput();
+						} else if (bSprintPressBeganInMenu) {
+							logger::debug("Sprint key tap ignored: the press began while a menu was open");
 						}
+						bSprintPressBeganInMenu = false;
 						bStoppingSprint = false;
 					}
 					return;  // a short tap is the dodge, not a sprint
@@ -51,15 +72,22 @@ namespace Hooks
 			const auto player = RE::PlayerCharacter::GetSingleton();
 			const auto userEvents = RE::UserEvents::GetSingleton();
 			if (player && userEvents && a_event->QUserEvent() == userEvents->sneak) {
+				if (a_event->IsDown()) {
+					bSneakPressBeganInMenu = Utility::IsInMenu();
+				}
 				if (a_event->IsDown() && player->IsSneaking()) {
 					bStopSneak = true;
 				} else if (a_event->HeldDuration() < Config::Settings::sneaking_press_duration.GetValue()) {
 					if (a_event->IsUp()) {
 						// Same guard as the sprint path above: a tap that closed a menu is not a dodge.
-						if (!Utility::IsInMenu() && !Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
+						if (!Utility::IsInMenu() && !bSneakPressBeganInMenu &&
+							!Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
 							logger::debug("Sneak key tapped ({:.2f}s) - dodge input", a_event->HeldDuration());
 							Dodge::OnInput();
+						} else if (bSneakPressBeganInMenu) {
+							logger::debug("Sneak key tap ignored: the press began while a menu was open");
 						}
+						bSneakPressBeganInMenu = false;
 						bStopSneak = false;
 					}
 					return;
