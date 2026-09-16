@@ -19,6 +19,21 @@ namespace Hooks
 	// Whether a press started in a menu is not a guess and does not depend on how long anything takes: a tap
 	// fires the dodge on RELEASE, so if the matching press went down while a menu was open, that tap belongs to
 	// the menu it closed and never to a dodge - however slowly the menu got around to closing.
+	// Did this hook actually SEE the press that is now being released?
+	//
+	// SprintHandler::ProcessButton is a player-control handler, and while a menu is open the game routes input to
+	// the menu instead - so a press made IN a menu never reaches here at all. Only its release does, once the menu
+	// has gone and player controls are live again, and a release on its own looks exactly like a clean tap. That is
+	// why the press-began-in-a-menu flag never caught it: there was no press to flag.
+	//
+	// The System tab closed fast enough for the time grace to cover the gap; Quest Journal Overhaul's journal is
+	// slower and slipped past it (the owner, 2026-09-16, on leaving the quest menu).
+	//
+	// A release with no matching press is therefore not a tap this handler can claim. It is timing-independent,
+	// which is the whole point - no menu has to close within any particular window.
+	static bool bSprintSawDown = false;
+	static bool bSneakSawDown = false;
+
 	static bool bSprintPressBeganInMenu = false;
 	static bool bSneakPressBeganInMenu = false;
 
@@ -34,6 +49,7 @@ namespace Hooks
 				const bool sprinting = player->GetPlayerRuntimeData().playerFlags.isSprinting;
 				if (a_event->IsDown()) {
 					bSprintPressBeganInMenu = Utility::IsInMenu();
+					bSprintSawDown = true;
 				}
 				if (a_event->IsDown() && sprinting) {
 					bStoppingSprint = true;  // this press ends a sprint rather than starting a dodge
@@ -45,14 +61,17 @@ namespace Hooks
 						// the SPRINT key, which is how the owner actually dodges - was not, so the guard appeared
 						// to do nothing (the owner, 2026-09-16: "TK dodges guard against dodging out of the quest
 						// journal menu did not work").
-						if (!Utility::IsInMenu() && !bSprintPressBeganInMenu &&
+						if (!Utility::IsInMenu() && !bSprintPressBeganInMenu && bSprintSawDown &&
 							!Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
 							logger::debug("Sprint key tapped ({:.2f}s) - dodge input", a_event->HeldDuration());
 							Dodge::OnInput();
-						} else if (bSprintPressBeganInMenu) {
-							logger::debug("Sprint key tap ignored: the press began while a menu was open");
+						} else if (bSprintPressBeganInMenu || !bSprintSawDown) {
+							logger::debug("Sprint key tap ignored: {}",
+										  bSprintSawDown ? "the press began while a menu was open"
+														 : "no matching press - it was made while a menu held input");
 						}
 						bSprintPressBeganInMenu = false;
+						bSprintSawDown = false;
 						bStoppingSprint = false;
 					}
 					return;  // a short tap is the dodge, not a sprint
@@ -74,20 +93,24 @@ namespace Hooks
 			if (player && userEvents && a_event->QUserEvent() == userEvents->sneak) {
 				if (a_event->IsDown()) {
 					bSneakPressBeganInMenu = Utility::IsInMenu();
+					bSneakSawDown = true;
 				}
 				if (a_event->IsDown() && player->IsSneaking()) {
 					bStopSneak = true;
 				} else if (a_event->HeldDuration() < Config::Settings::sneaking_press_duration.GetValue()) {
 					if (a_event->IsUp()) {
 						// Same guard as the sprint path above: a tap that closed a menu is not a dodge.
-						if (!Utility::IsInMenu() && !bSneakPressBeganInMenu &&
+						if (!Utility::IsInMenu() && !bSneakPressBeganInMenu && bSneakSawDown &&
 							!Compat::WithinMenuExitGrace(Config::Settings::menu_exit_grace.GetValue())) {
 							logger::debug("Sneak key tapped ({:.2f}s) - dodge input", a_event->HeldDuration());
 							Dodge::OnInput();
-						} else if (bSneakPressBeganInMenu) {
-							logger::debug("Sneak key tap ignored: the press began while a menu was open");
+						} else if (bSneakPressBeganInMenu || !bSneakSawDown) {
+							logger::debug("Sneak key tap ignored: {}",
+										  bSneakSawDown ? "the press began while a menu was open"
+														: "no matching press - it was made while a menu held input");
 						}
 						bSneakPressBeganInMenu = false;
+						bSneakSawDown = false;
 						bStopSneak = false;
 					}
 					return;
