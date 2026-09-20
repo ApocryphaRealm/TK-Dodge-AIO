@@ -16,5 +16,5 @@
 
 The mod package also carries TK Dodge's animations (tktk, TK Dodge SE "For RE" file), TK Dodge RE's behaviour patch
 (`Nemesis_Engine/mod/tkds`), the TK Dodge Animation Pandora Patch (Xingda666, with tktk's permission), the TK First Person
-Fix for Pandora (ThorKirienko) and `TKDodgeAddon.esp` (Styyx). Their authors' Nexus permissions govern redistribution;
-a public upload waits on those being confirmed.
+Fix for Pandora (ThorKirienko) and `TKDodgeAddon.esp` (Styyx). Each author is credited by name, with a link back to the original mod page, in NOTICE.md, the README and the
+Credit section of the mod page - the project standing policy for bundled assets (the owner, 2026-09-16).
