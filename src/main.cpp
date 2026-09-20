@@ -6,6 +6,7 @@
 #include "Settings.h"
 #include "ui.h"
 
+#include "utils/AddressLibraryGuard.h"
 #include "utils/Logger.h"
 #include "utils/Strings.h"
 
@@ -34,8 +35,15 @@ namespace
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
-	SKSE::Init(a_skse);
+	// The log first, then the Address Library guard, then SKSE::Init - in that order. CommonLibSSE-NG's
+	// Init opens the Address Library itself, so a guard placed after it never ran when the file was
+	// missing (oproso's wheeler.log, 2026-09-18); and the guard's own line has to land in a log that exists.
+	// When the file for this game is missing the plugin loads inert with a message that names it.
 	SKSE::log::init(std::string(MOD::LOG_NAME));
+	if (!AddressLibraryGuard::Guard("TK Dodge AIO")) {
+		return true;
+	}
+	SKSE::Init(a_skse);
 
 	Config::Settings::UpdateSettings(false);
 	Config::Settings::ApplyLogLevel();
