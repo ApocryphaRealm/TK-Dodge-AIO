@@ -6,7 +6,7 @@ TK Dodge RE and TK Dodge RE Addon in one SKSE plugin for Skyrim SE 1.5.97, with 
 
 WHAT CHANGED
 Version 1.0.2
-Fixed the T-pose when dodging with magic in hand: the package carried behaviour files generated years ago (meshesctors\characterehaviors and _1stpersonehaviors, plus an old animationdatasinglefile.txt) that outranked the behaviour engine's own output wherever the mod sat above it in the load order, and the magic graph in them had none of the current clips. Those files are gone; Pandora's output is the only behaviour now. Run Pandora once after updating.
+Fixed the T-pose when dodging with magic in hand: the package carried behaviour files generated years ago (meshes/actors/character/behaviors and _1stperson/behaviors, plus an old animationdatasinglefile.txt) that outranked the behaviour engine's own output wherever the mod sat above it in the load order, and the magic graph in them had none of the current clips. Those files are gone; Pandora's output is the only behaviour now. Run Pandora once after updating.
 
 Version 1.0.1
 Fixed dodging on the way out of a menu: a tap whose press began while a menu held input is never a dodge, however slowly the menu closes, and a release the plugin never saw the press for is refused outright. Covers the Sprint and Sneak tap dodges as well as the dodge key, and the quest journal as well as the System tab.
