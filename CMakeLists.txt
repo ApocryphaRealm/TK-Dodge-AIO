@@ -5,7 +5,7 @@
 # from xmake + an AE-only CommonLib fork to CMake + vcpkg CommonLibSSE-NG.
 project(
 	TKDodgeAIO
-	VERSION 1.0.1
+	VERSION 1.0.2
 	LANGUAGES CXX
 )
 

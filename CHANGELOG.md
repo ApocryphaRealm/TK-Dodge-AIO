@@ -3,6 +3,11 @@
 TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE Addon 3.1.5-era source by Styyx
 (upstream numbering is not continued).
 
+## 1.0.2 - 2026-09-20 - untested
+
+### Fixed
+- T-pose when dodging with magic in hand: the package carried behaviour files generated years ago (meshes\actors\character\behaviors and _1stperson\behaviors, plus an old animationdatasinglefile.txt) that outranked the behaviour engine's own output wherever the mod sat above it in the load order; the magic graph in those files had none of the current clips. Those files are gone - Pandora's output is the only behaviour now.
+
 ## 1.0.1 - 2026-09-16 - untested
 
 ### Fixed
