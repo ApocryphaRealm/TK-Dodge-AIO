@@ -4,6 +4,8 @@
 #include "Settings.h"
 
 #include "SKSEMenuFramework.h"
+#include "PreciseSlider.h"
+#include "SliderNudge.h"
 #include "utils/Logger.h"
 #include "utils/Strings.h"
 #include "utils/Toggle.h"
@@ -19,7 +21,6 @@ namespace Menu
 		using S = Config::Settings;
 
 		std::string g_status;
-		std::string g_selectedSlider;
 
 		constexpr const char* kEvents[] = { "TKDodgeBack", "TKDodgeForward", "TKDodgeLeft", "TKDodgeRight" };
 		constexpr const char* kEventKeys[] = { "TKD_EventBack", "TKD_EventForward", "TKD_EventLeft", "TKD_EventRight" };
@@ -73,23 +74,15 @@ namespace Menu
 		}
 
 		void Slider(const char* a_key, const char* a_label, Config::Value<float>& a_value, float a_min, float a_max,
-			const char* a_format, float a_step, const char* a_helpKey, const char* a_help)
+			const char* a_format, float /*a_step*/, const char* a_helpKey, const char* a_help)
 		{
 			float v = a_value.GetValue();
 			const std::string label = strings::TR(a_key, a_label);
-			bool changed = ImGuiMCP::SliderFloat(label.c_str(), &v, a_min, a_max, a_format);
-			if (ImGuiMCP::IsItemClicked() || ImGuiMCP::IsItemActive()) {
-				g_selectedSlider = a_value.key;
-			}
-			if (g_selectedSlider == a_value.key) {
-				float nudge = 0.0F;
-				if (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_LeftArrow) || ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_DownArrow)) { nudge -= a_step; }
-				if (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_RightArrow) || ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_UpArrow)) { nudge += a_step; }
-				if (nudge != 0.0F) {
-					v = std::clamp(v + nudge, a_min, a_max);
-					changed = true;
-				}
-			}
+			// rule 68 (applied at 1.1.0): precise::SliderFloat holds a keyboard / D-pad nudge to one unit of the shown digit,
+			// and precise::HighlightNudge steps a highlighted slider on Left / Right; they replace the a_step arrow nudge.
+			bool changed = precise::SliderFloat(label.c_str(), &v, a_min, a_max, a_format);
+			if (precise::HighlightNudge(&v, a_min, a_max, a_format)) { changed = true; }
+			v = std::clamp(v, a_min, a_max);
 			if (changed) {
 				a_value.SetValue(v);
 				logger::debug("UI: {} -> {:.2f}", a_value.key, v);

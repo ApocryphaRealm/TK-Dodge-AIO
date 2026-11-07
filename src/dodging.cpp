@@ -161,7 +161,11 @@ void ApplyDodgeCostActor(RE::Actor* a_actor)
     float dodgeCost = CalculateDodgeCost(a_actor);
     logger::debug("Dodge Cost first is {}", dodgeCost);
 
+#if RUNTIME_LINE == 17
+    a_actor->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kStamina, dodgeCost);  // 7.2: a positive amount
+#else
     a_actor->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kStamina, -dodgeCost);
+#endif
     logger::debug("Dodge cost {} applied to {}", dodgeCost, a_actor->GetName());
 }
 

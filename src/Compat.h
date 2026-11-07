@@ -97,7 +97,12 @@ namespace Compat
 	inline RE::ActorValue LookupActorValueByName(std::string_view a_name)
 	{
 		auto* list = RE::ActorValueList::GetSingleton();
+#if RUNTIME_LINE == 17
+		// CommonLibSSE-NG 7.2 takes a C string
+		return list ? list->LookupActorValueByName(std::string(a_name).c_str()) : RE::ActorValue::kNone;
+#else
 		return list ? list->LookupActorValueByName(a_name) : RE::ActorValue::kNone;
+#endif
 	}
 
 	inline bool IsPermanent(RE::MagicItem* a_item)

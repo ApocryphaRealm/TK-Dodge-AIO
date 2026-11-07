@@ -1,11 +1,11 @@
-﻿cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.21)
 
 # TK Dodge AIO - all-in-one TK Dodge for Skyrim SE 1.5.97 (and AE through CommonLibSSE-NG).
 # Fork of Styyx's TK Dodge RE Addon (GPL-3.0), itself built on Maxsu's TK Dodge RE (MIT), ported
 # from xmake + an AE-only CommonLib fork to CMake + vcpkg CommonLibSSE-NG.
 project(
 	TKDodgeAIO
-	VERSION 1.0.2
+	VERSION 1.1.0
 	LANGUAGES CXX
 )
 
@@ -30,6 +30,11 @@ find_package(spdlog REQUIRED CONFIG)
 find_package(directxtk CONFIG REQUIRED)  # CommonLibSSE-NG links Microsoft::DirectXTK
 
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${headers} ${sources})
+
+# Build line: 1 (SE/AE 1.6, CommonLibSSE-NG 3.7) or 17 (Skyrim 1.7.x, CommonLibSSE-NG 7.2).
+# The build-relwithdebinfo-17 preset sets this to 17; source #if-branches the NG 3.7 -> 7.2 API renames.
+set(RUNTIME_LINE "1" CACHE STRING "Build line: 1 (SE/AE 1.6) or 17 (Skyrim 1.7.x)")
+target_compile_definitions(${PROJECT_NAME} PRIVATE RUNTIME_LINE=${RUNTIME_LINE})
 add_library("${PROJECT_NAME}::${PROJECT_NAME}" ALIAS "${PROJECT_NAME}")
 
 # The DLL keeps the name TK Dodge RE and its addons use, so it REPLACES any of them rather than
