@@ -96,11 +96,21 @@ DodgeResult PerkCheck(const RE::Actor* a_actor)
 
 DodgeResult IsDodging(const RE::Actor* a_actor)
 {
-    if (bool bIsDodging = false; a_actor->GetGraphVariableBool("bIsDodging", bIsDodging) && !bIsDodging)
+    // 1.1.0 (round 2 of the Line-17 ports): bIsDodging exists only in a behaviour graph Nemesis / Pandora generated with
+    // TK Dodge's patch. Without it GetGraphVariableBool returns false, which this used to report as "Already dodging" on
+    // every press (the 1.7.104 test instance, 2026-11-07, which has no generated behaviours). Say what is missing instead.
+    bool bIsDodging = false;
+    if (!a_actor->GetGraphVariableBool("bIsDodging", bIsDodging))
     {
-        return DodgeResult::kSuccess;
+        static bool warned = false;
+        if (!warned)
+        {
+            warned = true;
+            logger::warn("Dodge: {}", DodgeResultToString(DodgeResult::kNoDodgeBehavior));
+        }
+        return DodgeResult::kNoDodgeBehavior;
     }
-    return DodgeResult::kIsDodging;
+    return bIsDodging ? DodgeResult::kIsDodging : DodgeResult::kSuccess;
 }
 
 bool IsInMCORecovery(const RE::Actor* a_actor)

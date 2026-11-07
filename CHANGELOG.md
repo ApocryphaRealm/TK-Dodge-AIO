@@ -12,6 +12,9 @@ TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE 
 - Settings-page sliders move one unit of the shown digit per arrow-key or D-pad press (precise sliders, as in our other mods), and step on Left / Right while highlighted.
 - Picking the wrong build for your game now says so plainly: 'this build does not support Skyrim <version>; your Address Library is fine', and names the installer option to choose, instead of reporting a missing Address Library file.
 
+### Fixed
+- Without the dodge behaviour in the animation graph (Nemesis / Pandora not run with TK Dodge), every press logged 'Already dodging'. The log now says once what is missing and to run Nemesis or Pandora.
+
 ## 1.0.2 - 2026-09-20 - untested
 
 ### Fixed

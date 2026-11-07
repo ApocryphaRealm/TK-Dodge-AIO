@@ -20,6 +20,7 @@ enum class DodgeResult : uint32_t
     kIsInWrongState,
     kStamina,
     kOverencumbered,
+    kNoDodgeBehavior,
     kUnknown = 99,
 };
 
@@ -40,6 +41,9 @@ inline const char* DodgeResultToString(const DodgeResult result)
 
         case DodgeResult::kIsDodging:
             return "Already dodging";
+
+        case DodgeResult::kNoDodgeBehavior:
+            return "the dodge behaviour is not in this character's animation graph (no bIsDodging variable) - run Nemesis or Pandora with TK Dodge ticked";
 
         case DodgeResult::kHasNoPerk:
             return "Missing required perk";
