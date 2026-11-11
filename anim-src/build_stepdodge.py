@@ -61,6 +61,27 @@ SPEC = {
              (0.8, "animmotion 0 -300.0 0")]),
 }
 
+# Rolls (the owner, 2026-11-11: "make a simple roll dodge for testing that can be replaced by other mods"): the four
+# vanilla-named roll clips the TK Dodge behaviour plays when step dodge is off. Length and annotation list are those
+# of the clips the package carried before (TK Dodge RE's), so the behaviour and any roll replacer still fit; the
+# motion is ours. Motion = the annotations' animmotion travel (those clips have no motion-data entry of their own).
+ROLL_ANN = {
+    "RollLeft": ("dodgeleft", 0.7, [(0.0, -0.0, 0), (0.0333, -5.33511, 0), (0.1, -28.8548, 0), (0.2, -68.0616, 0),
+        (0.3333, -111.319, 0), (0.5333, -179.919, 0), (0.6, -199.692, 0), (0.6667, -210.336, 0)]),
+    "RollRight": ("dodgeright", 0.7, [(0.0, 0, 0), (0.0333, 5.33511, 0), (0.1, 28.8548, 0), (0.2, 68.0616, 0),
+        (0.3333, 111.319, 0), (0.5333, 179.919, 0), (0.6, 199.692, 0), (0.6667, 210.336, 0)]),
+    "RollBack": ("dodgeback", 0.8, [(0.0, 0, 0), (0.1, 0, -3.90818), (0.2, 0, -17.8417), (0.3, 0, -43.0991),
+        (0.5667, 0, -152.089), (0.7, 0, -187.724), (0.8, 0, -202.3), (0.9, 0, -207.07)]),
+    "RollForward": ("sneakrun_forwardroll", 0.866667, [(0.0, 0, 0), (0.0667, 0, 12.963), (0.1333, 0, 38.1847),
+        (0.2333, 0, 90.7585), (0.3667, 0, 178.629), (0.5333, 0, 291.939), (0.6333, 0, 348.552), (0.7, 0, 376.935),
+        (0.7667, 0, 395.209), (0.8667, 0, 409.283)]),
+}
+def _g(v): return ("%.6g" % v) if v else "0"
+for _n, (_file, _dur, _keys) in ROLL_ANN.items():
+    SPEC[_n] = dict(md=None, file=_file, duration=_dur,
+        motion=[(t, x, y) for t, x, y in _keys if t <= _dur + 1e-6],
+        ann=[(t, "animmotion %s %s 0" % (_g(x), _g(y))) for t, x, y in _keys])
+
 addon_utils.enable("io_scene_nifly", default_set=True)
 from io_scene_nifly.hkx import anim_skyrim as AS
 from io_scene_nifly.hkx import anim_fo4 as AF
@@ -174,7 +195,11 @@ class Design:
         self.name, self.K = name, K
         self.duration = sp["duration"]; self.motion = sp["motion"]; self.ann = sp["ann"]
         self.nf = round(self.duration * FPS) + 1
-        self.ref = os.path.join(REF_DIR, f"StepDodge{name}.hkx")
+        if sp.get("file"):                      # a roll: vanilla-named clip one folder up from TKDodge\
+            self.file = sp["file"]; self.ref = os.path.join(os.path.dirname(REF_DIR), self.file + ".hkx")
+        else:
+            self.file = f"StepDodge{name}"; self.ref = os.path.join(REF_DIR, f"StepDodge{name}.hkx")
+    roll = False
     def root(self, f):
         """Motion-data root travel (linear between keys, as the engine reads it)."""
         t = f / FPS; m = self.motion
@@ -341,7 +366,53 @@ BACK = Design("Back", dict(
 FORWARD = Turned("Forward", LEFT, +1)
 BACK = Turned("Back", LEFT, -1)
 
-DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK}
+class Roll(Design):
+    """A simple tucked roll: crouch, dive, one full turn (end over end for Forward/Back, sideways for Left/Right),
+    then rise into the combat stance. tuck 0..1 carries the feet from their floor plants to tucked points that turn
+    with the body, and lets the head follow the body instead of staying level; solve_pose lifts the body wherever a
+    joint would go through the floor. axis 'pitch' turns about the actor's X, 'roll' about Y; sign is the travel
+    direction along that clip's axis (+ forward / right)."""
+    roll = True
+    def __init__(self, name, axis, sign, K):
+        super().__init__(name, K)
+        self.axis, self.sign = axis, sign
+        self.T = self.root(self.nf - 1)
+    def v(self, name, f):
+        g = lambda n: mono(self.K[n], f) if n in self.K else 0.0
+        turn = g("turn") * self.sign * (-1 if self.axis == "pitch" else 1)   # forward roll = pitch toward -
+        if name == "hip_pitch": return g("lean") + (turn if self.axis == "pitch" else 0.0)
+        if name == "hip_roll":  return turn if self.axis == "roll" else 0.0
+        return g(name)
+    def com_local(self, f):
+        lag = self.v("lag", f) * self.sign
+        off = Vector((lag, 0, 0)) if self.axis == "roll" else Vector((0, lag, 0))
+        return Vector((0, 0.5, self.v("com_z", f))) + off
+    def foot(self, pre, f):
+        sx, sy = (-14.0, 4.0) if pre == "lf" else (14.0, -5.0)
+        if f <= self.nf / 2: return sx, sy, 0.0, 0.0                       # take-off plants
+        return sx + self.T.x, sy + self.T.y, 0.0, 0.0                       # landing plants
+
+def roll_keys(n, a, b, c, d):
+    """Curves on the clip's own frames: a = take-off starts, b = tucked, c = untuck starts, d = on the feet."""
+    e = n - 1
+    return dict(
+        tuck=[(0, 0), (a, 0), (b, 1), (c, 1), (d, 0), (e, 0)],
+        turn=[(0, 0), (a + 1, 10), (b + 1, 100), ((b + c) / 2 + 1, 200), (c, 320), (d, 360), (e, 360)],
+        lean=[(0, -2), (a, -18), (b, -25), (c, -22), (d, -10), (e, -2)],
+        spine_pitch=[(0, -3), (a, -15), (b, -45), (c, -45), (d, -15), (e, -3)],
+        com_z=[(0, 64.5), (a, 51), (b, 38), (c, 38), (d, 49), (e, 64.5)],
+        lag=[(0, 0), (a, -6), (b + 1, 4), (d, 0), (e, 0)],
+        lh_dz=[(0, 0), (b, -8), (c, -8), (d, 0), (e, 0)], rh_dz=[(0, 0), (b, -8), (c, -8), (d, 0), (e, 0)],
+        lh_dy=[(0, 0), (b, -4), (c, -4), (d, 0), (e, 0)], rh_dy=[(0, 0), (b, -4), (c, -4), (d, 0), (e, 0)],
+    )
+ROLL_LEFT = Roll("RollLeft", "roll", -1, roll_keys(22, 2, 6, 15, 18))
+ROLL_RIGHT = Roll("RollRight", "roll", +1, roll_keys(22, 2, 6, 15, 18))
+ROLL_FORWARD = Roll("RollForward", "pitch", +1, roll_keys(27, 3, 7, 18, 22))
+ROLL_BACK = Roll("RollBack", "pitch", -1, roll_keys(25, 4, 8, 17, 21))
+TUCK = {"L": Vector((-11.0, -4.0, -24.0)), "R": Vector((11.0, -4.0, -24.0))}   # ankle offset from the COM, body frame
+
+DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK,
+           "RollLeft": ROLL_LEFT, "RollRight": ROLL_RIGHT, "RollForward": ROLL_FORWARD, "RollBack": ROLL_BACK}
 
 def ik2(s, t, l1, l2, pole):
     """Two-bone IK: joint position for root s, target t (clamped to reach), bending toward pole."""
@@ -382,14 +453,31 @@ def finger_setup():
                 FINGERS[IDX[nm]] = Rax(ax, curl[j])
 finger_setup()
 
+# joints that must stay above the floor in a roll, with the clearance each needs (body thickness around the joint)
+CLEAR = (("Head", 9.0), ("Neck", 7.0), ("Spine", 8.0), ("Pelvis", 8.0), ("Clavicle", 7.0), ("UpperArm", 6.0),
+         ("Forearm", 4.5), ("Hand", 3.5), ("Thigh", 7.0), ("Calf", 5.0))
 def solve_pose(D, f):
-    """World (root-local) 4x4 for every bone at frame f (0..NF-1)."""
+    """World (root-local) 4x4 for every bone at frame f (0..NF-1). A roll is solved twice: the second time with the
+    body raised by however far the first pass put a joint through the floor."""
+    G, reach, feet = _solve_pose(D, f)
+    if not D.roll: return G, reach, feet
+    pen = 0.0
+    for i, n in enumerate(BN):
+        if not n.startswith("NPC ") or "Root" in n: continue
+        for key, c in CLEAR:
+            if key in n: pen = max(pen, c - G[i].translation.z); break
+    if pen <= 0: return G, reach, feet
+    return _solve_pose(D, f, pen)
+
+def _solve_pose(D, f, dz=0.0):
     RO = D.root(f)
     G = [None] * len(BN)
     delta = {}                                   # bone -> extra rotation in rest-world axes
     over = {}                                    # bone -> forced global rotation (3x3)
     com = IDX["NPC COM [COM ]"]
     com_pos = D.com_local(f)                                                 # root-local
+    com_pos.z += dz
+    w = D.v("tuck", f) if D.roll else 0.0
     Rhip = Rax('Z', D.v("hip_yaw", f)) @ Rax('Y', D.v("hip_roll", f)) @ Rax('X', D.v("hip_pitch", f))
     sr, sp, sy = D.v("spine_roll", f) / 3, D.v("spine_pitch", f) / 3, -0.8 * D.v("hip_yaw", f) / 3
     for nm in ("NPC Spine [Spn0]", "NPC Spine1 [Spn1]", "NPC Spine2 [Spn2]"):
@@ -406,7 +494,11 @@ def solve_pose(D, f):
         if p >= 0:   pivot = anchor + (T - A)                              # ball of the foot
         else:        pivot = anchor + (heel_pt - A)
         ankle = pivot + Rf @ (anchor - pivot) + Vector((0, 0, lift))
-        feet[side] = (ankle, Rf, lift <= 0.05 and p >= 0)
+        if w > 0:                                   # roll: the foot goes to its tucked point, turning with the body
+            ankle = ankle.lerp(com_pos + Rhip @ TUCK[side], w)
+            Rt_ = (Rhip @ Rax(lat, -35)).to_quaternion()
+            Rf = Rf.to_quaternion().slerp(Rt_, w).to_matrix()
+        feet[side] = (ankle, Rf, lift <= 0.05 and p >= 0 and w <= 0.02)
     reach = {}
     for i in range(len(BN)):
         par = PAR[i]; name = BN[i]
@@ -426,6 +518,7 @@ def solve_pose(D, f):
                 h0, k0, a0 = P0(BN[th]), P0(BN[ca]), P0(BN[fo])
                 l1, l2 = (k0 - h0).length, (a0 - k0).length
                 pole = Vector((0.25 if side == "R" else -0.25, 1, 0))
+                if D.roll: pole = Rhip @ pole                 # knees stay to the body's front as it turns
                 knee, ank, r = ik2(s, ankle, l1, l2, pole); reach[side] = r
                 Rt = chain_rot((k0 - h0).normalized(), (a0 - k0).normalized(), (knee - s).normalized(), (ank - knee).normalized())
                 Rc = chain_rot((a0 - k0).normalized(), (k0 - h0).normalized() * -1, (ank - knee).normalized(), (knee - s).normalized() * -1)
@@ -456,10 +549,11 @@ def solve_pose(D, f):
         # head level and facing forward: neck takes half of the chest's rotation back out, the head all of it
         if name == "NPC Neck [Neck]":
             acc = (G[par].to_3x3() @ B0[par].transposed()).to_quaternion()
-            Rn = acc.slerp(Quaternion(), 0.5).to_matrix()
+            Rn = acc.slerp(Quaternion(), 0.5 * (1 - w)).to_matrix()      # in a roll the head follows the body
             G[i] = Matrix.Translation(G[i].translation) @ (Rn @ B0[i]).to_4x4()
         if name == "NPC Head [Head]":
-            G[i] = Matrix.Translation(G[i].translation) @ B0[i].to_4x4()
+            acc = (G[i].to_3x3() @ B0[i].transposed()).to_quaternion()
+            G[i] = Matrix.Translation(G[i].translation) @ (acc.slerp(Quaternion(), 1 - w).to_matrix() @ B0[i]).to_4x4()
     return G, reach, feet
 
 # ------------------------------------------------------------------------------------------------ build stage
@@ -518,7 +612,7 @@ def build(D):
         action.pose_markers.new(name).frame = fr
         sc.timeline_markers.new(name, frame=fr)
     bpy.context.view_layer.objects.active = arma; arma.select_set(True)
-    hkx = os.path.join(OUT, f"StepDodge{D.name}.hkx")
+    hkx = os.path.join(OUT, f"{D.file}.hkx")
     # PyNifly writes originalSkeletonName "Root"; vanilla clips (and the reference) say "NPC Root [Root]"
     orig_w = AS.write_skyrim_animation
     def w(path, anim, ptr_size=4):
@@ -530,12 +624,12 @@ def build(D):
     finally:
         AS.write_skyrim_animation = orig_w
     say(D.name, "export:", r, os.path.getsize(hkx) if os.path.exists(hkx) else "MISSING")
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"StepDodge{D.name}.blend"))
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"{D.file}.blend"))
 
 # ------------------------------------------------------------------------------------------------ verify stage
 def verify(D):
     out = {}
-    ours = AS.load_skyrim_animation(os.path.join(OUT, f"StepDodge{D.name}.hkx"))
+    ours = AS.load_skyrim_animation(os.path.join(OUT, f"{D.file}.hkx"))
     ref = AS.load_skyrim_animation(D.ref)
     for nm, a in (("ours", ours), ("reference", ref)):
         out[nm] = dict(duration=round(a.duration, 4), frames=a.num_frames, fps=round(1 / a.frame_duration, 3),
@@ -547,7 +641,7 @@ def verify(D):
     bpy.context.scene.render.fps = FPS
     arma = import_armature("Verify_Skeleton")
     bpy.context.view_layer.objects.active = arma; arma.select_set(True)
-    r = bpy.ops.import_scene.pynifly_hkx(filepath=os.path.join(OUT, f"StepDodge{D.name}.hkx"))
+    r = bpy.ops.import_scene.pynifly_hkx(filepath=os.path.join(OUT, f"{D.file}.hkx"))
     act = arma.animation_data.action
     out["reimport"] = dict(result=str(r), action=act.name, frame_range=list(act.frame_range),
                            markers=sorted([(m.frame, m.name) for m in act.pose_markers]),
@@ -587,7 +681,7 @@ def verify(D):
 
 # ------------------------------------------------------------------------------------------------ render stage
 def render(D):
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(OUT, f"StepDodge{D.name}.blend"))
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(OUT, f"{D.file}.blend"))
     NF = D.nf; T = D.root(NF - 1); C = T / 2
     sc = bpy.context.scene
     arma = bpy.data.objects["StepDodge_Skeleton"]; mr = arma.parent
