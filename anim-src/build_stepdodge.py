@@ -1,18 +1,22 @@
-# build_stepdodge.py - builds our own LEFT step-dodge for Skyrim SE from scratch, in Blender 5.2 + PyNifly.
+# build_stepdodge.py - builds our own four step dodges (Left, Right, Forward, Back) for Skyrim SE from scratch,
+# in Blender 5.2 + PyNifly.
 #
 # Everything here is procedural: the pose of every frame is computed from our own key curves (COM path, foot plants,
 # lean, guard), solved with our own two-bone IK, and keyed onto an armature built from the vanilla SE skeleton.hkx.
-# No existing dodge animation is read for motion - only the reference clip's length and annotation list are reused
+# No existing dodge animation is read for motion - only each reference clip's length and annotation list are reused
 # (see reference_report.md) so the existing TK Dodge behaviour patch and motion data still fit.
+# Right is the Left design mirrored across X in world space (feet, body path, lean, guard offsets), laid onto the
+# Right motion data; Forward (a lunge into a short run-out) and Back (a hop-step) are their own designs.
 #
 # Run (PowerShell or cmd):
 #   "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup
-#       --python-exit-code 1 --python build_stepdodge.py -- <stage> [<stage> ...]
-# Stages: build   - armature, keyed action, markers, StepDodgeLeft.blend + StepDodgeLeft.hkx (SE, 64-bit)
-#         verify  - re-import the exported hkx onto a fresh armature and compare with the skeleton + annotations
-#         render  - skin the vanilla-proportioned body (HIMBO meshes from the load order) and render the preview
+#       --python-exit-code 1 --python build_stepdodge.py -- <stage> [...] [<Direction> ...]
+# Stages: build   - armature, keyed action, markers, StepDodge<Dir>.blend + StepDodge<Dir>.hkx (SE, 64-bit)
+#         verify  - re-import the exported hkx onto a fresh armature and compare with the skeleton + reference
+#         render  - skin the HIMBO body meshes from the load order and render the preview frames
+# Directions: Left Right Forward Back (default: all four). Stages default to all three.
 #
-# Coordinates are Skyrim's: +Y forward, +X the actor's right, +Z up, game units (1 unit ~ 1.43 cm). The clip is
+# Coordinates are Skyrim's: +Y forward, +X the actor's right, +Z up, game units (1 unit ~ 1.43 cm). Each clip is
 # in place at NPC Root [Root]; travel comes from the behaviour's animationdatasinglefile motion data, so every
 # world-space plant below is turned into root-local space by subtracting the motion-data root path R(t).
 import bpy, sys, os, math, json, struct, addon_utils
@@ -22,21 +26,40 @@ from mathutils import Matrix, Vector, Quaternion
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = HERE
 SKEL_HKX = r"D:\Modlists\Njordlinger\mods\Pandora Behaviour Engine Plus\Pandora_Engine\Skyrim\Template\actors\character\character assets\skeleton.hkx"
-REF_HKX = r"D:\Modlists\Njordlinger\mods\test TK Dodge AIO 1.1.0\Meshes\Actors\Character\animations\TKDodge\StepDodgeLeft.hkx"
+REF_DIR = r"D:\Modlists\Njordlinger\mods\test TK Dodge AIO 1.1.0\Meshes\Actors\Character\animations\TKDodge"
 BODY_DIR = r"D:\Modlists\Njordlinger\mods\Highly Improved Male Body Overhaul (HIMBO)\meshes\actors\character\character assets"
 BODY_NIFS = ["malebody_1.nif", "malehands_1.nif", "malefeet_1.nif"]
 FPS = 30
-DURATION = 0.7                      # = animationdatasinglefile tkds$2 duration (TKDodgeLeft)
-NF = round(DURATION * FPS) + 1      # 22 sampled frames, f = 0..21 (Blender frames 1..22)
 
-# Motion data of TKDodgeLeft (animationdatasinglefile DefaultMale~1\tkds$2.txt): time, x, y, z.
-MOTION = [(0.0, 0.0), (0.06667, -23.0), (0.1, -45.0), (0.26667, -114.9), (0.53333, -214.1),
-          (0.63333, -244.3), (0.66667, -250.0), (0.7, -251.7)]
-# Annotations of the current clip (names and times kept identical; they mirror the motion data).
-ANNOTATIONS = [(0.0, "animmotion 0 0 0"), (0.0667, "animmotion -23.0 0 0"), (0.1, "animmotion -45.0 0 0"),
-               (0.2667, "animmotion -114.9 0 0"), (0.5333, "animmotion -214.1 0 0"),
-               (0.6333, "animmotion -244.3 0 0"), (0.6667, "animmotion -250.0 0 0"),
-               (0.7, "animmotion -251.7 0 0")]
+# Motion data (animationdatasinglefile DefaultMale~1, same in DefaultFemale~1): duration, then (time, x, y) keys.
+# Annotations of the current clips: names and times kept identical (they mirror the motion data).
+SPEC = {
+    "Left": dict(md="tkds$2", duration=0.7, motion=[(0.0, 0, 0), (0.06667, -23.0, 0), (0.1, -45.0, 0),
+        (0.26667, -114.9, 0), (0.53333, -214.1, 0), (0.63333, -244.3, 0), (0.66667, -250.0, 0), (0.7, -251.7, 0)],
+        ann=[(0.0, "animmotion 0 0 0"), (0.0667, "animmotion -23.0 0 0"), (0.1, "animmotion -45.0 0 0"),
+             (0.2667, "animmotion -114.9 0 0"), (0.5333, "animmotion -214.1 0 0"), (0.6333, "animmotion -244.3 0 0"),
+             (0.6667, "animmotion -250.0 0 0"), (0.7, "animmotion -251.7 0 0")]),
+    "Right": dict(md="tkds$3", duration=0.7, motion=[(0.0, 0, 0), (0.06667, 28.6, 0), (0.1, 50.0, 0),
+        (0.23333, 102.0, 0), (0.53333, 224.5, 0), (0.66667, 251.2, 0), (0.7, 251.2, 0)],
+        ann=[(0.0, "animmotion 0 0 0"), (0.0667, "animmotion 28.6 0 0"), (0.1, "animmotion 50.0 0 0"),
+             (0.2333, "animmotion 102.0 0 0"), (0.5333, "animmotion 224.5 0 0"), (0.6667, "animmotion 251.2 0 0"),
+             (0.7, "animmotion 251.2 0 0")]),
+    "Forward": dict(md="tkds$0", duration=0.866667, motion=[(0.0, 0, 0), (0.0666667, -2.44943e-07, 12.963),
+        (0.133333, -1.68889e-06, 38.1847), (0.233333, -4.79072e-06, 90.7585), (0.366667, -1.05933e-05, 178.629),
+        (0.533333, -1.91211e-05, 291.939), (0.633333, -2.41794e-05, 348.552), (0.7, -2.72645e-05, 376.935),
+        (0.766667, -2.99817e-05, 395.209), (0.866667, -3.30838e-05, 409.283)],
+        ann=[(0.0, "animmotion 0 0 0"), (0.0667, "animmotion 0 12.963 0"), (0.1333, "animmotion 0 38.1847 0"),
+             (0.2333, "animmotion 0 90.7585 0"), (0.3667, "animmotion 0 178.629 0"), (0.5333, "animmotion 0 291.939 0"),
+             (0.6333, "animmotion 0 348.552 0"), (0.7, "animmotion 0 376.935 0"), (0.7667, "animmotion 0 395.209 0"),
+             (0.8667, "animmotion 0 409.283 0")]),
+    "Back": dict(md="tkds$1", duration=0.8, motion=[(0.0, 0, 0), (0.1, 0, -38.0), (0.16667, 0, -78.5),
+        (0.26667, 0, -129.6), (0.46667, 0, -223.2), (0.53333, 0, -250.8), (0.56667, 0, -265.2), (0.6, 0, -278.6),
+        (0.7, 0, -296.5), (0.8, 0, -300.0)],
+        ann=[(0.0, "animmotion 0 0 0"), (0.1, "animmotion 0 -38.0 0"), (0.1667, "animmotion 0 -78.5 0"),
+             (0.2667, "animmotion 0 -129.6 0"), (0.4667, "animmotion 0 -223.2 0"), (0.5333, "animmotion 0 -250.8 0"),
+             (0.5667, "animmotion 0 -265.2 0"), (0.6, "animmotion 0 -278.6 0"), (0.7, "animmotion 0 -296.5 0"),
+             (0.8, "animmotion 0 -300.0 0")]),
+}
 
 addon_utils.enable("io_scene_nifly", default_set=True)
 from io_scene_nifly.hkx import anim_skyrim as AS
@@ -136,23 +159,88 @@ def mono(keys, f):
             h00 = 2*t**3 - 3*t**2 + 1; h10 = t**3 - 2*t**2 + t; h01 = -2*t**3 + 3*t**2; h11 = t**3 - t**2
             return h00 * ys[i] + h10 * h * m[i] + h01 * ys[i + 1] + h11 * h * m[i + 1]
 
-def root_x(f):
-    """Motion-data root travel (linear between keys, as the engine reads it)."""
-    t = f / FPS
-    for (t0, x0), (t1, x1) in zip(MOTION, MOTION[1:]):
-        if t <= t1: return x0 + (x1 - x0) * (t - t0) / (t1 - t0)
-    return MOTION[-1][1]
-
 def Rax(axis, deg):
     return Matrix.Rotation(radians(deg), 3, axis)
 
 # ------------------------------------------------------------------------------------------------ the motion
-# All positions WORLD (floor) space; root-local = world - (root_x(f), 0, 0).
-K = dict(
-    # body (COM) lag behind the capsule (+ = to the actor's right of the root). It holds still while the capsule
+# All positions WORLD (floor) space; root-local = world - R(f). Every design ends in the same combat stance:
+# COM root-local (0, 0.5, 64.5), hips/spine at (pitch -2 / -3, no roll or yaw), left ankle over (-14, +4),
+# right ankle over (+14, -5), guard at LH_GUARD / RH_GUARD - and starts in it too, so all four blend alike.
+LH_GUARD = Vector((-10.0, 14.0, 97.0)); RH_GUARD = Vector((10.0, 12.0, 95.0))
+
+class Design:
+    def __init__(self, name, K):
+        sp = SPEC[name]
+        self.name, self.K = name, K
+        self.duration = sp["duration"]; self.motion = sp["motion"]; self.ann = sp["ann"]
+        self.nf = round(self.duration * FPS) + 1
+        self.ref = os.path.join(REF_DIR, f"StepDodge{name}.hkx")
+    def root(self, f):
+        """Motion-data root travel (linear between keys, as the engine reads it)."""
+        t = f / FPS; m = self.motion
+        for (t0, x0, y0), (t1, x1, y1) in zip(m, m[1:]):
+            if t <= t1:
+                u = (t - t0) / (t1 - t0); return Vector((x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, 0))
+        return Vector((m[-1][1], m[-1][2], 0))
+    def v(self, name, f):
+        return mono(self.K[name], f) if name in self.K else 0.0
+    def com_local(self, f):
+        return Vector((self.v("com_off_x", f), self.v("com_off_y", f), self.v("com_z", f)))
+    def foot(self, pre, f):
+        return self.v(pre + "_x", f), self.v(pre + "_y", f), self.v(pre + "_lift", f), self.v(pre + "_heel", f)
+
+class Mirror(Design):
+    """The source design mirrored across X (the actor's left/right) in WORLD space, laid onto this direction's own
+    motion data: feet, body path and lean are mirrored, lateral distances scaled to this clip's travel. The fore-aft
+    (y) stance offsets stay with each foot's own side, so start and end stance are the same as every other clip."""
+    def __init__(self, name, src):
+        super().__init__(name, {})
+        self.src = src
+        self.s = abs(self.motion[-1][1]) / abs(src.motion[-1][1])
+    NEG = {"hip_roll", "hip_yaw", "spine_roll", "com_off_x"}
+    def v(self, name, f):
+        S = self.src
+        if name in self.NEG: return -S.v(name, f)
+        if name.startswith(("lh_", "rh_")):
+            o = ("rh_" if name.startswith("lh_") else "lh_") + name[3:]
+            return -S.v(o, f) if name.endswith("dx") else S.v(o, f)
+        return S.v(name, f)
+    def com_local(self, f):
+        S = self.src
+        w = S.root(f) + Vector((S.v("com_off_x", f), S.v("com_off_y", f), 0))
+        loc = Vector((-w.x * self.s, w.y, 0)) - self.root(f)
+        loc.z = S.v("com_z", f)
+        return loc
+    def foot(self, pre, f):
+        other = "rf" if pre == "lf" else "lf"
+        x, y, lift, heel = self.src.foot(other, f)
+        dy = 9.0 if pre == "lf" else -9.0          # left stance y +4 vs right -5
+        return -x * self.s, y + dy, lift, heel
+
+def gait(pre, plants, lifts):
+    """Foot curves from a plant list: plants = [(first frame, last frame, x, y, toe-off heel degrees)], lifts =
+    swing heights between consecutive plants. Swings ease in and out; the heel peels up through the last frames of
+    each plant (pivot on the ball), toes lift a touch before the next contact."""
+    X, Y, L, H = {}, {}, {}, {}
+    for i, (fs, fe, x, y, toe) in enumerate(plants):
+        X[fs] = X[fe] = x; Y[fs] = Y[fe] = y; L[fs] = L[fe] = 0.0
+        H[fs] = 0.0
+        if i < len(plants) - 1:
+            nfs = plants[i + 1][0]
+            if fe - 2 > fs: H[fe - 2] = 0.0
+            H[fe] = toe; H[fe + (nfs - fe) * 0.35] = toe * 0.4
+            if nfs - 1 > fe + (nfs - fe) * 0.35 + 0.5: H[nfs - 1] = -4.0
+            L[(fe + nfs) / 2] = lifts[i]
+        else:
+            H[fe] = 0.0
+    srt = lambda d: sorted(d.items())
+    return {pre + "_x": srt(X), pre + "_y": srt(Y), pre + "_lift": srt(L), pre + "_heel": srt(H)}
+
+LEFT = Design("Left", dict(
+    # body (COM) offset from the capsule (+ = to the actor's right of the root). It holds still while the capsule
     # starts (anticipation), is thrown left by the push, leads a little while braking, and settles on the root.
     com_off_x=[(0, 0), (1, 11), (2, 21), (3, 29), (4, 32), (6, 22), (9, 2), (13, -12), (17, -9), (21, 0)],
-    com_y=[(0, 0.5), (4, -1), (12, 1.5), (21, 0.5)],
+    com_off_y=[(0, 0.5), (4, -1), (12, 1.5), (21, 0.5)],
     # height: dip (load) -> push extension -> low hop apex -> landing compression -> back to the combat stance
     com_z=[(0, 64.5), (2, 60), (4, 61.5), (8, 64.5), (13, 58.5), (15, 56), (18, 61.5), (21, 64.5)],
     hip_roll=[(0, 0), (2, 2.5), (5, -5), (9, -7), (13, -3), (16, 2), (19, 0.5), (21, 0)],    # about +Y; - leans left
@@ -173,9 +261,47 @@ K = dict(
     # guard: hand targets in the chest's frame (given in rest-pose coordinates), plus small balance offsets
     lh_dx=[(0, 0), (4, -4), (9, -6), (14, -2), (21, 0)], lh_dz=[(0, 0), (4, 2), (9, 3), (14, -1), (21, 0)],
     rh_dx=[(0, 0), (5, 2), (10, 3), (15, 0), (21, 0)], rh_dz=[(0, 0), (5, -1), (12, -2), (21, 0)],
-)
-LH_GUARD = Vector((-10.0, 14.0, 97.0)); RH_GUARD = Vector((10.0, 12.0, 95.0))
-def k(name, f): return mono(K[name], f)
+))
+
+RIGHT = Mirror("Right", LEFT)
+
+# Forward: 409 units in 0.867 s is far more than one step can cover, so it is a lunge into a short run-out:
+# anticipation dip with the body held back, push off the rear (right) foot, a long low lunge onto the left,
+# two quick running steps with the trunk pitched forward, and a right-left catch-up into the stance.
+_FY = 409.283
+FORWARD = Design("Forward", dict(
+    com_off_x=[(0, 0), (3, 2), (8, -3), (13, 3), (18, -3), (23, 1), (26, 0)],
+    com_off_y=[(0, 0.5), (2, -9), (4, -13), (7, -6), (11, 3), (17, 8), (22, 6), (26, 0.5)],
+    com_z=[(0, 64.5), (2, 60), (4, 61), (7, 57.5), (9, 59), (12, 57.5), (14, 59), (17, 57.5), (19, 59), (22, 58),
+           (24, 61.5), (26, 64.5)],
+    hip_pitch=[(0, -2), (3, -6), (7, -10), (14, -11), (20, -8), (24, -4), (26, -2)],
+    hip_roll=[(0, 0), (8, 2), (13, -2), (18, 2), (23, -1), (26, 0)],
+    hip_yaw=[(0, 0), (4, -4), (8, 5), (13, -5), (18, 5), (22, -3), (26, 0)],
+    spine_pitch=[(0, -3), (4, -7), (14, -8), (22, -5), (26, -3)],
+    lh_dy=[(0, 0), (5, 3), (9, -3), (13, 3), (18, -3), (22, 1), (26, 0)],
+    rh_dy=[(0, 0), (5, -3), (9, 3), (13, -3), (18, 3), (22, -1), (26, 0)],
+    **gait("lf", [(0, 2, -14, 4, 14), (7, 10, -12, 115, 25), (17, 20, -12, 347, 22), (24, 26, -14, _FY + 4, 0)],
+           [6, 10, 5]),
+    **gait("rf", [(0, 4, 14, -5, 28), (12, 15, 12, 236, 25), (22, 26, 14, _FY - 5, 0)], [10, 9]),
+))
+
+# Back: a hop-step backward - dip and lean in, push off the ball of the front (left) foot, low hop back onto the
+# right foot, the left catches up, the right steps back once more to brake, the left adjusts into the stance.
+BACK = Design("Back", dict(
+    com_off_x=[(0, 0), (10, 2), (16, -2), (21, 1), (24, 0)],
+    com_off_y=[(0, 0.5), (2, 10), (4, 12), (7, 4), (11, -6), (16, -10), (20, -6), (24, 0.5)],
+    com_z=[(0, 64.5), (2, 59.5), (4, 61.5), (7, 63.5), (10, 58), (13, 57), (17, 60), (21, 63), (24, 64.5)],
+    hip_pitch=[(0, -2), (2, -6), (5, 1), (10, 0), (15, -6), (19, -4), (24, -2)],
+    hip_roll=[(0, 0), (9, 2), (15, -2), (21, 0.5), (24, 0)],
+    hip_yaw=[(0, 0), (5, 3), (12, -3), (18, 2), (24, 0)],
+    spine_pitch=[(0, -3), (2, -6), (6, -1), (15, -7), (24, -3)],
+    lh_dy=[(0, 0), (4, 4), (10, 2), (16, -1), (24, 0)], rh_dy=[(0, 0), (4, 4), (10, 2), (16, -1), (24, 0)],
+    lh_dz=[(0, 0), (4, 2), (12, 0), (24, 0)], rh_dz=[(0, 0), (4, 2), (12, 0), (24, 0)],
+    **gait("lf", [(0, 3, -14, 4, 22), (15, 19, -12, -262, 8), (23, 24, -14, -296, 0)], [7, 3]),
+    **gait("rf", [(0, 2, 14, -5, 8), (9, 12, 12, -172, 20), (19, 24, 14, -305, 0)], [7, 6]),
+))
+
+DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK}
 
 def ik2(s, t, l1, l2, pole):
     """Two-bone IK: joint position for root s, target t (clamped to reach), bending toward pole."""
@@ -216,16 +342,16 @@ def finger_setup():
                 FINGERS[IDX[nm]] = Rax(ax, curl[j])
 finger_setup()
 
-def solve_pose(f):
+def solve_pose(D, f):
     """World (root-local) 4x4 for every bone at frame f (0..NF-1)."""
-    rx = root_x(f); RO = Vector((rx, 0, 0))
+    RO = D.root(f)
     G = [None] * len(BN)
     delta = {}                                   # bone -> extra rotation in rest-world axes
     over = {}                                    # bone -> forced global rotation (3x3)
     com = IDX["NPC COM [COM ]"]
-    com_pos = Vector((k("com_off_x", f), k("com_y", f), k("com_z", f)))      # root-local already (offset from root)
-    Rhip = Rax('Z', k("hip_yaw", f)) @ Rax('Y', k("hip_roll", f)) @ Rax('X', k("hip_pitch", f))
-    sr, sp, sy = k("spine_roll", f) / 3, k("spine_pitch", f) / 3, -0.8 * k("hip_yaw", f) / 3
+    com_pos = D.com_local(f)                                                 # root-local
+    Rhip = Rax('Z', D.v("hip_yaw", f)) @ Rax('Y', D.v("hip_roll", f)) @ Rax('X', D.v("hip_pitch", f))
+    sr, sp, sy = D.v("spine_roll", f) / 3, D.v("spine_pitch", f) / 3, -0.8 * D.v("hip_yaw", f) / 3
     for nm in ("NPC Spine [Spn0]", "NPC Spine1 [Spn1]", "NPC Spine2 [Spn2]"):
         delta[IDX[nm]] = Rax('Z', sy) @ Rax('Y', sr) @ Rax('X', sp)
     for i, R in FINGERS.items(): delta[i] = R
@@ -234,8 +360,8 @@ def solve_pose(f):
         A = P0(f"NPC {side} Foot [{side}ft ]"); T = P0(f"NPC {side} Toe0 [{side}Toe]")
         fwd = Vector(((T - A).x, (T - A).y, 0)).normalized(); lat = fwd.cross(Vector((0, 0, 1)))
         heel_pt = A + Vector((0, 0, -A.z)) - fwd * 3.0           # back of the heel on the floor
-        anchor = Vector((k(pre + "_x", f) - rx, k(pre + "_y", f), A.z))      # flat-foot ankle position, root-local
-        lift = k(pre + "_lift", f); p = k(pre + "_heel", f)
+        fx_, fy_, lift, p = D.foot(pre, f)
+        anchor = Vector((fx_ - RO.x, fy_ - RO.y, A.z))                     # flat-foot ankle position, root-local
         Rf = Rax(lat, -p)
         if p >= 0:   pivot = anchor + (T - A)                              # ball of the foot
         else:        pivot = anchor + (heel_pt - A)
@@ -275,7 +401,7 @@ def solve_pose(f):
             if i == ua:
                 ch = IDX["NPC Spine2 [Spn2]"]
                 pre = "lh" if side == "L" else "rh"
-                tgt_rest = (LH_GUARD if side == "L" else RH_GUARD) + Vector((k(pre + "_dx", f), 0, k(pre + "_dz", f)))
+                tgt_rest = (LH_GUARD if side == "L" else RH_GUARD) + Vector((D.v(pre + "_dx", f), D.v(pre + "_dy", f), D.v(pre + "_dz", f)))
                 tgt = G[ch] @ (G0[ch].inverted() @ tgt_rest)
                 s = G[i].translation
                 s0, e0, w0 = P0(BN[ua]), P0(BN[fa]), P0(BN[ha])
@@ -301,19 +427,20 @@ def clear_scene():
     for o in list(bpy.data.objects): bpy.data.objects.remove(o)
     for a in list(bpy.data.actions): bpy.data.actions.remove(a)
 
-def build():
+def build(D):
     clear_scene()
     sc = bpy.context.scene
+    NF = D.nf
     sc.render.fps = FPS; sc.frame_start = 1; sc.frame_end = NF
     arma = import_armature()
     arma.data.display_type = 'STICK'
     # the root path from the motion data, on an empty the armature rides (preview only - not part of the clip)
     mr = bpy.data.objects.new("MotionData_Root (preview travel)", None); sc.collection.objects.link(mr)
     bpy.context.preferences.edit.keyframe_new_interpolation_type = 'LINEAR'     # motion data is read linearly
-    for t, x in MOTION:
-        mr.location = (x, 0, 0); mr.keyframe_insert("location", frame=1 + t * FPS)
+    for t, x, y in D.motion:
+        mr.location = (x, y, 0); mr.keyframe_insert("location", frame=1 + t * FPS)
     arma.parent = mr
-    action = bpy.data.actions.new("StepDodgeLeft")
+    action = bpy.data.actions.new(f"StepDodge{D.name}")
     arma.animation_data_create(); arma.animation_data.action = action
     for b in arma.data.bones:
         try: b.select = False
@@ -327,7 +454,7 @@ def build():
     prevq = {}
     reach_log = []
     for f in range(NF):
-        G, reach, feet = solve_pose(f)
+        G, reach, feet = solve_pose(D, f)
         reach_log.append({k_: round(v, 3) for k_, v in reach.items()})
         M = {i: G[i] @ Cfix[i] for i in Cfix}
         for pb in arma.pose.bones:
@@ -343,15 +470,15 @@ def build():
             pb.rotation_mode = 'QUATERNION'
             pb.location = loc; pb.rotation_quaternion = q
             pb.keyframe_insert("location", frame=f + 1); pb.keyframe_insert("rotation_quaternion", frame=f + 1)
-    say("leg/arm reach (target distance / chain length, >1 means clamped):")
+    say(D.name, "leg/arm reach (target distance / chain length, >1 means clamped):")
     for f, r in enumerate(reach_log): say("  f%02d" % f, r)
     action.use_frame_range = True; action.frame_start = 1; action.frame_end = NF
-    for t, name in ANNOTATIONS:
+    for t, name in D.ann:
         fr = 1 + round(t * FPS)
         action.pose_markers.new(name).frame = fr
         sc.timeline_markers.new(name, frame=fr)
     bpy.context.view_layer.objects.active = arma; arma.select_set(True)
-    hkx = os.path.join(OUT, "StepDodgeLeft.hkx")
+    hkx = os.path.join(OUT, f"StepDodge{D.name}.hkx")
     # PyNifly writes originalSkeletonName "Root"; vanilla clips (and the reference) say "NPC Root [Root]"
     orig_w = AS.write_skyrim_animation
     def w(path, anim, ptr_size=4):
@@ -362,14 +489,14 @@ def build():
         r = bpy.ops.export_scene.pynifly_hkx(filepath=hkx, game='SKYRIM_SE', fps=FPS, reference_skel=SKEL_HKX)
     finally:
         AS.write_skyrim_animation = orig_w
-    say("export:", r, os.path.getsize(hkx) if os.path.exists(hkx) else "MISSING")
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "StepDodgeLeft.blend"))
+    say(D.name, "export:", r, os.path.getsize(hkx) if os.path.exists(hkx) else "MISSING")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"StepDodge{D.name}.blend"))
 
 # ------------------------------------------------------------------------------------------------ verify stage
-def verify():
+def verify(D):
     out = {}
-    ours = AS.load_skyrim_animation(os.path.join(OUT, "StepDodgeLeft.hkx"))
-    ref = AS.load_skyrim_animation(REF_HKX)
+    ours = AS.load_skyrim_animation(os.path.join(OUT, f"StepDodge{D.name}.hkx"))
+    ref = AS.load_skyrim_animation(D.ref)
     for nm, a in (("ours", ours), ("reference", ref)):
         out[nm] = dict(duration=round(a.duration, 4), frames=a.num_frames, fps=round(1 / a.frame_duration, 3),
                        tracks=a.num_tracks, blend_hint=a.blend_hint, skeleton_name=a.original_skeleton_name,
@@ -380,7 +507,7 @@ def verify():
     bpy.context.scene.render.fps = FPS
     arma = import_armature("Verify_Skeleton")
     bpy.context.view_layer.objects.active = arma; arma.select_set(True)
-    r = bpy.ops.import_scene.pynifly_hkx(filepath=os.path.join(OUT, "StepDodgeLeft.hkx"))
+    r = bpy.ops.import_scene.pynifly_hkx(filepath=os.path.join(OUT, f"StepDodge{D.name}.hkx"))
     act = arma.animation_data.action
     out["reimport"] = dict(result=str(r), action=act.name, frame_range=list(act.frame_range),
                            markers=sorted([(m.frame, m.name) for m in act.pose_markers]),
@@ -389,9 +516,9 @@ def verify():
                            hkx_bone_list_matches_skeleton_order=arma.get('PYN_HKX_BONES', '').split(';') == BN)
     # compare re-imported pose with the solver at a few frames (world positions of key joints)
     errs = []
-    for f in (0, 5, 10, 15, 21):
+    for f in sorted({0, D.nf // 4, D.nf // 2, 3 * D.nf // 4, D.nf - 1}):
         bpy.context.scene.frame_set(f + 1)
-        G, _, _ = solve_pose(f)
+        G, _, _ = solve_pose(D, f)
         for nm in ("NPC COM [COM ]", "NPC L Foot [Lft ]", "NPC R Foot [Rft ]", "NPC L Hand [LHnd]", "NPC R Hand [RHnd]", "NPC Head [Head]"):
             pb = arma.pose.bones[nm]
             errs.append(((arma.matrix_world @ pb.matrix).translation - G[IDX[nm]].translation).length)
@@ -399,19 +526,29 @@ def verify():
     names_in_tracks = len(ours.tracks) == len(BN)
     out["track_count_equals_skeleton"] = names_in_tracks
     # which tracks actually move in ours
-    moving = []
-    for i, t in enumerate(ours.tracks):
-        dt = max(math.dist(t.translations[0], x) for x in t.translations)
-        dr = max(1 - abs(sum(p * q for p, q in zip(t.rotations[0], x))) for x in t.rotations)
-        if dt > 0.01 or dr > 1e-6: moving.append(BN[i])
-    out["ours_animated_bones"] = moving
-    out["ours_root_track_static"] = BN[0] not in moving
-    json.dump(out, open(os.path.join(OUT, "_verify.json"), "w"), indent=1)
+    def moving(a):
+        m = []
+        for i, t in enumerate(a.tracks):
+            dt = max(math.dist(t.translations[0], x) for x in t.translations)
+            dr = max(1 - abs(sum(p * q for p, q in zip(t.rotations[0], x))) for x in t.rotations)
+            if dt > 0.01 or dr > 1e-6: m.append(BN[i])
+        return m
+    def translating(a):
+        return [BN[i] for i, t in enumerate(a.tracks) if max(math.dist(t.translations[0], x) for x in t.translations) > 0.01]
+    for nm, a in (("ours", ours), ("reference", ref)):
+        out[nm]["animated_bones"] = moving(a); out[nm]["translating_bones"] = translating(a)
+        out[nm]["root_track_static"] = BN[0] not in moving(a)
+    ra, oa = out["reference"]["annotations"], out["ours"]["annotations"]
+    out["annotations_match_reference"] = (len(ra) == len(oa) and
+        all(r_[1] == o_[1] and abs(r_[0] - o_[0]) < 0.002 for r_, o_ in zip(ra, oa)))
+    out["duration_matches_motion_data"] = abs(out["ours"]["duration"] - D.duration) < 0.001
+    json.dump(out, open(os.path.join(OUT, f"_verify_{D.name}.json"), "w"), indent=1)
     say(json.dumps(out, indent=1))
 
 # ------------------------------------------------------------------------------------------------ render stage
-def render():
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(OUT, "StepDodgeLeft.blend"))
+def render(D):
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(OUT, f"StepDodge{D.name}.blend"))
+    NF = D.nf; T = D.root(NF - 1); C = T / 2
     sc = bpy.context.scene
     arma = bpy.data.objects["StepDodge_Skeleton"]; mr = arma.parent
     sc.frame_set(1)
@@ -460,17 +597,18 @@ def render():
     sh.background_type = 'VIEWPORT'; sh.background_color = (0.42, 0.42, 0.42)
     try: sc.display.shadow_focus = 0.2
     except Exception: pass
-    bpy.ops.mesh.primitive_plane_add(size=1, location=(-120, 0, -0.05)); fl = bpy.context.object; fl.name = "Floor"
-    fl.scale = (700, 300, 1)
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(C.x, C.y, -0.05)); fl = bpy.context.object; fl.name = "Floor"
+    fl.scale = (1400, 1400, 1)
     mat = bpy.data.materials.new("floor"); mat.diffuse_color = (0.50, 0.50, 0.50, 1); fl.data.materials.append(mat)
     # grid lines every 20 units across x (shows plants vs. slide)
     gm = bpy.data.materials.new("grid"); gm.diffuse_color = (0.33, 0.33, 0.33, 1)
-    for gx in range(-320, 81, 20):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(gx, 0, 0.0)); c = bpy.context.object
-        c.scale = (0.5, 120, 0.12); c.data.materials.append(gm)
-    for gy in range(-40, 41, 20):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(-120, gy, 0.0)); c = bpy.context.object
-        c.scale = (420, 0.5, 0.12); c.data.materials.append(gm)
+    x0, x1 = min(0, T.x) - 80, max(0, T.x) + 80; y0, y1 = min(0, T.y) - 80, max(0, T.y) + 80
+    for gx in range(int(x0 // 20) * 20, int(x1) + 1, 20):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(gx, C.y, 0.0)); c = bpy.context.object
+        c.scale = (0.5, y1 - y0, 0.12); c.data.materials.append(gm)
+    for gy in range(int(y0 // 20) * 20, int(y1) + 1, 20):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(C.x, gy, 0.0)); c = bpy.context.object
+        c.scale = (x1 - x0, 0.5, 0.12); c.data.materials.append(gm)
     for o in bpy.data.objects:
         if o.type == 'MESH' and o.name not in ("Floor",) and not o.data.materials:
             pass
@@ -490,11 +628,14 @@ def render():
         if parent: co.parent = parent
         return co
     # wide front: static, the whole lateral travel; close front and close side ride the root (motion data)
-    wide = cam("CamWide", (-125, 600, 150), (radians(80), 0, radians(180)), 330)
+    if abs(T.x) >= abs(T.y):     # lateral travel: wide view from the front
+        wide = cam("CamWide", (C.x, 600, 150), (radians(80), 0, radians(180)), abs(T.x) + 80)
+    else:                        # forward/back travel: wide view from the actor's left side
+        wide = cam("CamWide", (-600, C.y, 150), (radians(80), 0, radians(-90)), abs(T.y) + 110)
     front = cam("CamFront", (0, 600, 66), (radians(90), 0, radians(180)), 150, parent=mr)
     side = cam("CamSide", (-600, 0, 66), (radians(90), 0, radians(-90)), 150, parent=mr)
     RES = {"CamWide": (1440, 540), "CamFront": (720, 720), "CamSide": (720, 720)}
-    frames_dir = os.path.join(OUT, "_frames"); os.makedirs(frames_dir, exist_ok=True)
+    frames_dir = os.path.join(OUT, "_frames", D.name); os.makedirs(frames_dir, exist_ok=True)
     # contact metrics on the evaluated feet mesh: lowest point per frame, and drift of the planted foot
     dg = bpy.context.evaluated_depsgraph_get()
     feet_obj = [o for o in bpy.data.objects if o.type == 'MESH' and 'feet' in o.name.lower()]
@@ -504,16 +645,19 @@ def render():
             ev = feet_obj[0].evaluated_get(dg); me = ev.to_mesh()
             zs = [(ev.matrix_world @ v.co) for v in me.vertices]
             lz = min(zs, key=lambda p: p.z)
-            say("frame %02d feet lowest z %.2f at x %.1f" % (f, lz.z, lz.x)); ev.to_mesh_clear()
+            say(D.name, "frame %02d feet lowest z %.2f at (%.1f, %.1f)" % (f, lz.z, lz.x, lz.y)); ev.to_mesh_clear()
         for c in (front, side, wide):
             sc.camera = c
             sc.render.resolution_x, sc.render.resolution_y = RES[c.name]
             sc.render.filepath = os.path.join(frames_dir, f"{c.name}_{f:03d}.png")
             bpy.ops.render.render(write_still=True)
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "_preview_scene.blend"))
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"_preview_{D.name}.blend"))
 
 if __name__ == "__main__":
-    stages = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["build", "verify", "render"]
-    for st in stages:
-        {"build": build, "verify": verify, "render": render}[st]()
-    open(os.path.join(OUT, f"_log_{'_'.join(stages)}.txt"), "w").write("\n".join(log))
+    args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    stages = [a_ for a_ in args if a_ in ("build", "verify", "render")] or ["build", "verify", "render"]
+    dirs = [a_ for a_ in args if a_ in DESIGNS] or list(DESIGNS)
+    for d in dirs:
+        for st in stages:
+            {"build": build, "verify": verify, "render": render}[st](DESIGNS[d])
+    open(os.path.join(OUT, f"_log_{'_'.join(stages)}_{'_'.join(dirs)}.txt"), "w").write("\n".join(log))
