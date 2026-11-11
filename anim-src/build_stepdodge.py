@@ -582,6 +582,78 @@ class Diagonal(Design):
 for _n, (_src, _axis, _dist) in DIAG.items():
     DESIGNS[_n] = Diagonal(_n, DESIGNS[_src], _axis)
 
+# Forward-Right and Back-Left switch stance (the owner, 2026-11-11): "the forward right and backward left dodges have to
+# turn the whole character's body to position the leg that they're pushing off with forward ... they have to bring
+# their right foot forward and their left foot back and jump, and that should turn their whole body as they do that."
+# The push foot steps across to the other side of the stance while the whole body turns (body_yaw, hips and chest
+# together, head kept to the front), the lead foot travels all the way to its landing in one swing, then the push foot
+# swings through and lands second - ending in the normal stance (left foot forward), the body turned back. The switch
+# comes before the travel, so these two clips are 5 frames longer and their motion starts 0.1667 s later.
+SWITCH_DELAY = 5
+class SwitchDiagonal(Design):
+    def __init__(self, name, axis, dist, K):
+        super().__init__(name, K)
+        self.u = Vector((axis[0], axis[1], 0.0))
+    def com_local(self, f):
+        lag = self.v("lag", f)
+        return Vector((0.0, 0.5, self.v("com_z", f))) + self.u * lag
+
+def _switch_spec(name, src):
+    S = SPEC[src]; tot = abs(S["motion"][-1][1]); _src_, (ux, uy), dist = DIAG[name]
+    dt = SWITCH_DELAY / FPS
+    mo = [(0.0, 0.0, 0.0), (dt, 0.0, 0.0)] + [(round(t + dt, 5), ux * abs(x) / tot * dist, uy * abs(x) / tot * dist)
+                                               for t, x, y in S["motion"] if t > 0]
+    SPEC[name] = dict(md=None, duration=round(S["duration"] + dt, 6), motion=mo,
+                      ann=[(round(t, 4), "animmotion %s %s 0" % (_g(round(x, 3)), _g(round(y, 3)))) for t, x, y in mo])
+
+def _switch_keys(name):
+    _src, (ux, uy), dist = DIAG[name]; Ex, Ey = ux * dist, uy * dist; e = 26
+    fwd = uy > 0                                   # Forward-Right: lead right, push left; Back-Left: lead left, push right
+    lead, push = ("rf", "lf") if fwd else ("lf", "rf")
+    st = {"lf": (-12.0, 16.0), "rf": (12.0, -16.0)}                 # normal stance (left foot forward)
+    sw = {"lf": (-12.0, -16.0), "rf": (12.0, 16.0)}                 # switched stance
+    K = dict(
+        body_yaw=[(0, 0), (3, 25), (6, 50), (18, 50), (23, 25), (e, 0)],     # whole body turns to the switched side
+        com_z=[(0, 64.5), (2, 61), (5, 57), (8, 62), (13, 65), (18, 62), (21, 56), (24, 60), (e, 64.5)],
+        lag=[(0, 0), (4, -4), (8, 0), (16, 8), (21, 6), (e, 0)],
+        hip_roll=[(0, 0), (6, 4 * ux / abs(ux)), (14, 3 * ux / abs(ux)), (21, -2 * ux / abs(ux)), (e, 0)],
+        hip_pitch=[(0, -2), (6, -6 if fwd else -4), (14, -5 if fwd else -3), (21, -6), (e, -2)],
+        spine_pitch=[(0, -3), (6, -7), (16, -6), (e, -3)],
+    )
+    K.update(gait(lead, [(0, 3, st[lead][0], st[lead][1], 10), (21, e, st[lead][0] + Ex, st[lead][1] + Ey, 0)], [14]))
+    K.update(gait(push, [(0, 0, st[push][0], st[push][1], 8), (3, 6, sw[push][0], sw[push][1], 30),
+                         (25, e, st[push][0] + Ex, st[push][1] + Ey, 0)], [5, 12]))
+    # keep both feet within reach of the body: their travel follows the root (this clip's own motion data), the push
+    # foot trailing behind it and passing under the body, the lead foot a little ahead of it until it lands
+    mo = SPEC[name]["motion"]
+    def root(fr):
+        t = fr / FPS
+        for (t0, x0, y0), (t1, x1, y1) in zip(mo, mo[1:]):
+            if t <= t1:
+                k = (t - t0) / (t1 - t0) if t1 > t0 else 1.0
+                return x0 + (x1 - x0) * k, y0 + (y1 - y0) * k
+        return mo[-1][1], mo[-1][2]
+    def path(pre, base, keys, start, end_fr):
+        xs, ys = [(0, st[pre][0])], [(0, st[pre][1])]
+        xs += [(start[0], start[1])]; ys += [(start[0], start[2])]
+        for fr, off in keys:
+            rx, ry = root(fr)
+            xs.append((fr, base[0] + rx + ux * off)); ys.append((fr, base[1] + ry + uy * off))
+        xs += [(end_fr, st[pre][0] + Ex), (e, st[pre][0] + Ex)]; ys += [(end_fr, st[pre][1] + Ey), (e, st[pre][1] + Ey)]
+        K[pre + "_x"], K[pre + "_y"] = xs, ys
+    path(push, st[push], [(9, -38), (12, -28), (15, -18), (18, -8), (21, -3)], (6, sw[push][0], sw[push][1]), 25)
+    path(lead, st[lead], [(7, 26), (11, 36), (15, 34), (18, 20)], (3, st[lead][0], st[lead][1]), 21)
+    # foot turn per frame: the rear foot is turned out; the push foot becomes the rear foot while switched
+    out = {"lf": 45.0, "rf": -45.0}
+    K[lead + "_yaw"] = [(0, 0 if lead == "lf" else out["rf"]), (21, 0 if lead == "lf" else out["rf"]), (e, 0 if lead == "lf" else out["rf"])]
+    K[push + "_yaw"] = [(0, 0 if push == "lf" else out["rf"]), (3, out[push]), (6, out[push]), (16, out[push] * 0.3),
+                        (25, 0 if push == "lf" else out["rf"]), (e, 0 if push == "lf" else out["rf"])]
+    return K
+
+for _n in ("ForwardRight", "BackLeft"):
+    _switch_spec(_n, DIAG[_n][0])
+    DESIGNS[_n] = SwitchDiagonal(_n, DIAG[_n][1], DIAG[_n][2], _switch_keys(_n))
+
 # The owner, 2026-11-11: "the side to side dodges should have front facing feet only the front and back would have the
 # perpendicular feet" - left/right clips (step and roll) keep both feet pointing forward.
 for _d in (LEFT, RIGHT, ROLL_LEFT, ROLL_RIGHT):
@@ -700,7 +772,7 @@ def _solve_pose(D, f, dz=0.0):
     # staggered stance (left foot forward): hips and shoulders turn together so the right shoulder sits back over the
     # right leg (the owner, 2026-11-11: "the hips and shoulder should match"); the head is held facing forward. The
     # turn fades out while a roll is tucked. The spine counters only the clip's own hip_yaw, not this stance turn.
-    y0 = STANCE_YAW * (1 - w)
+    y0 = STANCE_YAW * (1 - w) + D.v("body_yaw", f)     # body_yaw: a whole-body turn some clips key (stance switch)
     Rhip = Rax('Z', D.v("hip_yaw", f) + y0) @ Rax('Y', D.v("hip_roll", f)) @ Rax('X', D.v("hip_pitch", f))
     sr, sp, sy = D.v("spine_roll", f) / 3, D.v("spine_pitch", f) / 3, -0.8 * D.v("hip_yaw", f) / 3
     for nm in ("NPC Spine [Spn0]", "NPC Spine1 [Spn1]", "NPC Spine2 [Spn2]"):
@@ -714,7 +786,11 @@ def _solve_pose(D, f, dz=0.0):
         fx_, fy_, lift, p = D.foot(pre, f)
         # foot turn (the owner, 2026-11-11): front (left) toes point where you face, the support (right) foot
         # perpendicular; eased toward straight while the foot is in the air, and the knee follows the foot
-        Ry = Rax('Z', getattr(D, "foot_yaw", FOOT_YAW)[side] * (1 - 0.6 * min(1.0, lift / 6.0))); yaws[side] = Ry
+        if (pre + "_yaw") in D.K:   # a per-frame foot turn the clip keys itself
+            Ry = Rax('Z', D.v(pre + "_yaw", f))
+        else:
+            Ry = Rax('Z', getattr(D, "foot_yaw", FOOT_YAW)[side] * (1 - 0.6 * min(1.0, lift / 6.0)))
+        yaws[side] = Ry
         TA = Ry @ (T - A)
         fwd = Vector((TA.x, TA.y, 0)).normalized(); lat = fwd.cross(Vector((0, 0, 1)))
         heel_pt = A + Vector((0, 0, -A.z)) - fwd * 3.0           # back of the heel on the floor
