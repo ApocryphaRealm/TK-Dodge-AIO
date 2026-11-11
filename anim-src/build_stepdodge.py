@@ -621,8 +621,14 @@ def _switch_keys(name):
         spine_pitch=[(0, -3), (6, -7), (16, -6), (e, -3)],
     )
     K.update(gait(lead, [(0, 3, st[lead][0], st[lead][1], 10), (21, e, st[lead][0] + Ex, st[lead][1] + Ey, 0)], [14]))
-    K.update(gait(push, [(0, 0, st[push][0], st[push][1], 8), (3, 6, sw[push][0], sw[push][1], 30),
-                         (25, e, st[push][0] + Ex, st[push][1] + Ey, 0)], [5, 12]))
+    if not fwd:
+        # Back-Left, amended (the owner, 2026-11-11): "just bring the left foot back behind the character. And jump
+        # with the right before the left foot lands" - no switch step: the right foot stays where it stands and pushes
+        sw = dict(st)
+        K.update(gait(push, [(0, 6, st[push][0], st[push][1], 30), (25, e, st[push][0] + Ex, st[push][1] + Ey, 0)], [12]))
+    else:
+        K.update(gait(push, [(0, 0, st[push][0], st[push][1], 8), (3, 6, sw[push][0], sw[push][1], 30),
+                             (25, e, st[push][0] + Ex, st[push][1] + Ey, 0)], [5, 12]))
     # keep both feet within reach of the body: their travel follows the root (this clip's own motion data), the push
     # foot trailing behind it and passing under the body, the lead foot a little ahead of it until it lands
     mo = SPEC[name]["motion"]
