@@ -1,0 +1,92 @@
+# showcase_render.py - renders a dodge clip for the Nexus page: the character in a full armour set (body, cuirass,
+# boots, gauntlets, helmet from the load order) on a lit floor, EEVEE, one three-quarter camera that rides the clip's
+# root, written as PNG frames to _showcase\<Design>\ for make_showcase_gif. The owner, 2026-11-11: "Would it be possible
+# to play those GIFs with a loaded character's body with armor on?"
+# Run: blender --background --factory-startup --python showcase_render.py -- <Design> [<Design> ...]
+import bpy, sys, os, math
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_stepdodge as B
+from mathutils import Matrix, Vector
+from math import radians
+
+ARMOR_DIR = r"D:\Modlists\Njordlinger\mods\unpublished Nordic Ebony Armor and Weapons Replacer\meshes\armor\ebony\m"
+PIECES = [os.path.join(B.BODY_DIR, "malebody_1.nif")] + [os.path.join(ARMOR_DIR, n) for n in
+          ("cuirass_1.nif", "boots_1.nif", "gauntlets_1.nif", "helmet_1.nif")]
+W, H = 720, 480
+
+def dress(arma):
+    arma.data.pose_position = 'REST'
+    for nif in PIECES:
+        before = set(bpy.data.objects)
+        for o in bpy.context.selected_objects: o.select_set(False)
+        bpy.context.view_layer.objects.active = None
+        bpy.ops.import_scene.pynifly(filepath=nif, blender_xf=False, rename_bones=False, rename_bones_niftools=False,
+                                     rotate_bones_pretty=False, import_animations=False, import_collisions=False,
+                                     import_tris=False, import_shapekeys=False)
+        new = [o for o in bpy.data.objects if o not in before]
+        for o in new:
+            if o.type == 'MESH':
+                mw = o.matrix_world.copy()
+                for m in o.modifiers:
+                    if m.type == 'ARMATURE': m.object = arma
+                o.parent = arma; o.parent_type = 'OBJECT'
+                o.matrix_parent_inverse = Matrix.Identity(4); o.matrix_basis = mw
+                imgs = [n.image.name for mat in o.data.materials if mat and mat.use_nodes
+                        for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image]
+                B.say("dressed", os.path.basename(nif), o.name, "textures:", imgs[:3])
+        for o in new:
+            if o.type == 'ARMATURE': bpy.data.objects.remove(o)
+            elif o.type == 'EMPTY' and not o.children: bpy.data.objects.remove(o)
+    arma.data.pose_position = 'POSE'
+
+def stage(D, mr):
+    sc = bpy.context.scene
+    T = D.root(D.nf - 1)
+    for eng in ('BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE'):
+        try: sc.render.engine = eng; break
+        except TypeError: pass
+    sc.render.resolution_x, sc.render.resolution_y = W, H
+    sc.render.image_settings.file_format = 'PNG'
+    sc.view_settings.view_transform = 'AgX' if 'AgX' in [v.identifier for v in sc.view_settings.bl_rna.properties['view_transform'].enum_items] else 'Filmic'
+    # floor: large plane, stone-grey with a faint checker so the travel reads
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(T.x / 2, T.y / 2, 0)); fl = bpy.context.object
+    fl.scale = (1600, 1600, 1)
+    m = bpy.data.materials.new("floor"); m.use_nodes = True; nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]; ch = nt.nodes.new("ShaderNodeTexChecker"); tc = nt.nodes.new("ShaderNodeTexCoord")
+    ch.inputs["Scale"].default_value = 64.0
+    ch.inputs["Color1"].default_value = (0.20, 0.19, 0.18, 1); ch.inputs["Color2"].default_value = (0.25, 0.24, 0.22, 1)
+    nt.links.new(tc.outputs["UV"], ch.inputs["Vector"]); nt.links.new(ch.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = 0.85
+    fl.data.materials.append(m)
+    # light: warm key sun, cool fill, dim world
+    sun = bpy.data.objects.new("Key", bpy.data.lights.new("Key", 'SUN')); sc.collection.objects.link(sun)
+    sun.data.energy = 3.5; sun.data.color = (1.0, 0.93, 0.82); sun.rotation_euler = (radians(50), radians(10), radians(140))
+    fill = bpy.data.objects.new("Fill", bpy.data.lights.new("Fill", 'SUN')); sc.collection.objects.link(fill)
+    fill.data.energy = 1.0; fill.data.color = (0.75, 0.82, 1.0); fill.rotation_euler = (radians(65), 0, radians(-60))
+    if sc.world is None: sc.world = bpy.data.worlds.new("World")
+    sc.world.use_nodes = True
+    sc.world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.09, 0.095, 0.11, 1)
+    sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.0
+    # camera: three-quarter front, riding the root so the body stays framed and the floor moves under it
+    cd = bpy.data.cameras.new("Show"); cd.lens = 50
+    cam = bpy.data.objects.new("Show", cd); sc.collection.objects.link(cam); cam.parent = mr
+    cam.location = (230, 330, 120)
+    d = Vector((0, 0, 70)) - cam.location
+    cam.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
+    sc.camera = cam
+
+def render(D):
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(B.OUT, f"{D.file}.blend"))
+    arma = bpy.data.objects["StepDodge_Skeleton"]; mr = arma.parent
+    dress(arma)
+    stage(D, mr)
+    out = os.path.join(B.OUT, "_showcase", D.name); os.makedirs(out, exist_ok=True)
+    sc = bpy.context.scene
+    for f in range(1, D.nf + 1):
+        sc.frame_set(f); sc.render.filepath = os.path.join(out, f"{f:03d}.png")
+        bpy.ops.render.render(write_still=True)
+    B.say("showcase", D.name, D.nf, "frames ->", out)
+
+if __name__ == "__main__":
+    args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["Forward"]
+    for k in args: render(B.DESIGNS[k])
