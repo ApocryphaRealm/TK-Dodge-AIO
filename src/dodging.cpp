@@ -196,8 +196,28 @@ DodgeEventResult GetDodgeEvent(std::string& a_event)
     else
     {
         constexpr RE::NiPoint2 forwardVector(0.f, 1.f);
-        if (const float dodgeAngle = Utility::GetAngle(normalizedInputDirection, forwardVector);
-            dodgeAngle >= -2 * PI8 && dodgeAngle < 2 * PI8)
+        const float dodgeAngle = Utility::GetAngle(normalizedInputDirection, forwardVector);
+        // 8-way (the owner, 2026-11-11): eight 45-degree sectors centred on the eight directions; negative angles are
+        // to the left. Pure forward still honours "Block forward dodge"; the forward diagonals are not blocked.
+        if (Config::Settings::eight_way.GetValue())
+        {
+            if (dodgeAngle >= -PI8 && dodgeAngle < PI8)
+            {
+                if (Config::Settings::remove_forward.GetValue())
+                    return DodgeEventResult::kForwardBlocked;
+                a_event = "TKDodgeForward";
+            }
+            else if (dodgeAngle >= PI8 && dodgeAngle < 3 * PI8)       a_event = "TKDodgeForwardRight";
+            else if (dodgeAngle >= 3 * PI8 && dodgeAngle < 5 * PI8)   a_event = "TKDodgeRight";
+            else if (dodgeAngle >= 5 * PI8 && dodgeAngle < 7 * PI8)   a_event = "TKDodgeBackRight";
+            else if (dodgeAngle >= -3 * PI8 && dodgeAngle < -PI8)     a_event = "TKDodgeForwardLeft";
+            else if (dodgeAngle >= -5 * PI8 && dodgeAngle < -3 * PI8) a_event = "TKDodgeLeft";
+            else if (dodgeAngle >= -7 * PI8 && dodgeAngle < -5 * PI8) a_event = "TKDodgeBackLeft";
+            else                                                      a_event = "TKDodgeBack";
+            logger::debug("8-way dodge: angle {:.2f} -> {}", dodgeAngle, a_event);
+            return DodgeEventResult::kSuccess;
+        }
+        if (dodgeAngle >= -2 * PI8 && dodgeAngle < 2 * PI8)
         {
             if (Config::Settings::remove_forward.GetValue())
                 return DodgeEventResult::kForwardBlocked;

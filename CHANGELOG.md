@@ -6,9 +6,12 @@ TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE 
 ## 1.1.0 - 2026-11-07 - untested
 
 ### Added
+- Our own step dodges and rolls for every direction (one foot leads, the push foot lands second, staggered stance), and an open-hand unarmed set through Open Animation Replacer.
+- Eight-way dodging: four diagonal step dodges of our own, chosen from eight 45-degree directions (setting Eight-way dodging, on by default; off gives the four main directions).
 - A Skyrim 1.7.x build (1.7.99 / 1.7.104). The installer now asks which Skyrim you have: SE 1.5.97 / AE 1.6.1170, or Skyrim 1.7.x (needs SKSE 2.3.x and Address Library All-in-One v13 or newer). The 1.7 build is the same source compiled against CommonLibSSE-NG 7.2.0.
 
 ### Changed
+- Step dodge is on by default.
 - The settings page is listed in the menu as Simple Dodge.
 - The four step dodges (forward, back, left, right) are new animations of our own: a weighted step with a guard up, no roll. Same file names, so any TK Dodge step-dodge replacer still replaces them.
 - The sprint-key dodge's tap window (fSprintingPressDuration) defaults to 0.30 s instead of 0.50 s, so holding the Sprint button sprints sooner.

@@ -35,7 +35,7 @@ namespace Config
 		// [Settings]
 		inline static Value<bool>        enable_sneak_key_dodge{ "Settings", "bEnableSneakKeyDodge", false };
 		inline static Value<bool>        enable_dodge_in_place{ "Settings", "bEnableDodgeInPlace", true };
-		inline static Value<bool>        step_dodge{ "Settings", "bStepDodge", false };
+		inline static Value<bool>        step_dodge{ "Settings", "bStepDodge", true };
 		inline static Value<bool>        enable_sneak_dodge{ "Settings", "bEnableSneakDodge", false };
 		inline static Value<bool>        enable_dodge_attack_cancel{ "Settings", "bEnableDodgeAttackCancel", true };
 		inline static Value<bool>        only_cancel_light{ "Settings", "bOnlyCancelLightAttacks", false };
@@ -54,6 +54,8 @@ namespace Config
 		inline static Value<bool>        use_perk_lock{ "Settings", "bUsePerkLock", false };
 		inline static Value<bool>        use_percentage_cost{ "Settings", "bUsePercentageCost", false };
 		inline static Value<bool>        remove_forward{ "Settings", "bRemoveForwardDodge", false };
+		// 8-way (the owner, 2026-11-11): diagonals get their own dodge; off = the four main directions only
+		inline static Value<bool>        eight_way{ "Settings", "bEightWayDodge", true };
 		// How long after a menu CLOSES a dodge key press is ignored, in seconds.
 		//
 		// The menu-open check is not enough on its own: the press that closes a menu is delivered to gameplay in the

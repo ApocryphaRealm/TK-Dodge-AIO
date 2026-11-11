@@ -248,6 +248,7 @@ namespace Menu
 			Help(strings::TR("TKD_HelpDefaultDir", "The direction used when dodging without holding a direction."));
 		}
 		Switch("TKD_NoForward", "Block forward dodge", S::remove_forward, "TKD_HelpNoForward", "Holding forward does not dodge.");
+		Switch("TKD_EightWay", "Eight-way dodging", S::eight_way, "TKD_HelpEightWay", "Diagonal directions get their own dodge. Off: the four main directions only. Needs Pandora run again.");
 		Switch("TKD_NoThird", "Only in first person", S::disable_in_third, "TKD_HelpNoThird", "Turns dodging off in third person.");
 		Slider("TKD_IFrames", "Invincibility time", S::i_frame_duration, 0.0F, 3.0F, "%.2f s", 0.05F, "TKD_HelpIFrames",
 			"How long you cannot be hit after a dodge starts. Needs IFrame Generator RE. Animations with their own i-frame annotations ignore this.");
