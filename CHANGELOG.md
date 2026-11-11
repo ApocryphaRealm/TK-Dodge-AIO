@@ -9,6 +9,7 @@ TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE 
 - A Skyrim 1.7.x build (1.7.99 / 1.7.104). The installer now asks which Skyrim you have: SE 1.5.97 / AE 1.6.1170, or Skyrim 1.7.x (needs SKSE 2.3.x and Address Library All-in-One v13 or newer). The 1.7 build is the same source compiled against CommonLibSSE-NG 7.2.0.
 
 ### Changed
+- The four step dodges (forward, back, left, right) are new animations of our own: a weighted step with a guard up, no roll. Same file names, so any TK Dodge step-dodge replacer still replaces them.
 - The sprint-key dodge's tap window (fSprintingPressDuration) defaults to 0.30 s instead of 0.50 s, so holding the Sprint button sprints sooner.
 - Settings-page sliders move one unit of the shown digit per arrow-key or D-pad press (precise sliders, as in our other mods), and step on Left / Right while highlighted.
 - Picking the wrong build for your game now says so plainly: 'this build does not support Skyrim <version>; your Address Library is fine', and names the installer option to choose, instead of reporting a missing Address Library file.
