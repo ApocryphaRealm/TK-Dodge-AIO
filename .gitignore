@@ -6,3 +6,7 @@ contrib/Plugin*
 .vscode
 .xmake
 vsxmake2022
+anim-src/_frames/
+anim-src/_log_*.txt
+anim-src/_preview_scene.blend
+anim-src/_verify.json
