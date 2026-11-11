@@ -265,6 +265,43 @@ LEFT = Design("Left", dict(
 
 RIGHT = Mirror("Right", LEFT)
 
+class Turned(Design):
+    """The Left hop turned onto the fore-aft axis (the owner, 2026-11-11: forward and back must be one jump like left
+    and right, not several quick steps). Left's design is time-scaled onto this clip's own duration and its travel
+    scaled to this clip's distance; this clip's motion data and annotations are kept as they are. The foot on the side
+    of travel leads (Forward: the front, left foot; Back: the rear, right foot) and the other follows, each in one long
+    swing, exactly as Left's lead and trail feet do. Left's sideways lean becomes a pitch toward the travel."""
+    def __init__(self, name, src, sign):
+        super().__init__(name, {})
+        self.src, self.sign = src, sign                       # sign +1 forward, -1 back
+        self.s = abs(self.motion[-1][2]) / abs(src.motion[-1][1])
+        self.k = (src.nf - 1) / (self.nf - 1)                 # this frame -> Left frame
+        self.lead, self.trail = ("lf", "rf") if sign > 0 else ("rf", "lf")
+        self.lean = 1.0 if sign > 0 else 0.5                  # lean back less than forward
+    def fl(self, f): return f * self.k
+    def v(self, name, f):
+        S, g = self.src, self.fl(f)
+        if name == "hip_pitch":   return S.v("hip_pitch", g) + self.sign * self.lean * S.v("hip_roll", g)
+        if name == "spine_pitch": return S.v("spine_pitch", g) + self.sign * self.lean * S.v("spine_roll", g)
+        if name in ("hip_roll", "spine_roll"): return 0.0
+        if name == "hip_yaw":     return S.v("hip_yaw", g)
+        if name in ("lh_dy", "rh_dy"): return -self.sign * S.v(name[:3] + "dx", g)
+        if name in ("lh_dz", "rh_dz"): return S.v(name, g)
+        return 0.0
+    def com_local(self, f):
+        S, g = self.src, self.fl(f)
+        a = -(S.root(g).x + S.v("com_off_x", g)) * self.s              # distance travelled along the dodge
+        w = Vector((0, 0.5 + self.sign * a, 0))
+        loc = w - self.root(f); loc.z = S.v("com_z", g)
+        return loc
+    def foot(self, pre, f):
+        S, g = self.src, self.fl(f)
+        if pre == self.lead:   x, y, lift, heel = S.foot("lf", g); a = -x - 14.0   # Left's lead foot
+        else:                  x, y, lift, heel = S.foot("rf", g); a = -x + 14.0   # Left's trail foot
+        sx, sy = (-14.0, 4.0) if pre == "lf" else (14.0, -5.0)                     # this foot's own stance
+        return sx, sy + self.sign * a * self.s, lift * math.sqrt(self.s), heel
+
+# Former designs, replaced 2026-11-11 by Turned (they read as several quick steps, not one jump):
 # Forward: 409 units in 0.867 s is far more than one step can cover, so it is a lunge into a short run-out:
 # anticipation dip with the body held back, push off the rear (right) foot, a long low lunge onto the left,
 # two quick running steps with the trunk pitched forward, and a right-left catch-up into the stance.
@@ -300,6 +337,9 @@ BACK = Design("Back", dict(
     **gait("lf", [(0, 3, -14, 4, 22), (15, 19, -12, -262, 8), (23, 24, -14, -296, 0)], [7, 3]),
     **gait("rf", [(0, 2, 14, -5, 8), (9, 12, 12, -172, 20), (19, 24, 14, -305, 0)], [7, 6]),
 ))
+
+FORWARD = Turned("Forward", LEFT, +1)
+BACK = Turned("Back", LEFT, -1)
 
 DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK}
 
