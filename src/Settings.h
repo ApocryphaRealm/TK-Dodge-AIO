@@ -41,7 +41,7 @@ namespace Config
 		inline static Value<bool>        only_cancel_light{ "Settings", "bOnlyCancelLightAttacks", false };
 		inline static Value<float>       i_frame_duration{ "Settings", "fIFrameDuration", 0.3F };
 		inline static Value<std::string> default_dodge_event{ "Settings", "sDefaultDodgeEvent", std::string("TKDodgeBack") };
-		inline static Value<float>       sprinting_press_duration{ "Settings", "fSprintingPressDuration", 0.5F };
+		inline static Value<float>       sprinting_press_duration{ "Settings", "fSprintingPressDuration", 0.3F };
 		inline static Value<float>       sneaking_press_duration{ "Settings", "fSneakingPressDuration", 0.5F };
 		inline static Value<bool>        use_double_tap{ "Settings", "bUseDoubleTap", false };
 		inline static Value<bool>        disable_in_third{ "Settings", "bDisableInThird", false };
