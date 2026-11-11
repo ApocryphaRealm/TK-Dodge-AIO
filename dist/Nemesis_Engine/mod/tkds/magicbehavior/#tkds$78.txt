@@ -1,0 +1,10 @@
+		<hkobject name="#tkds$78" class="hkbManualSelectorGenerator" signature="0xd932fab8">
+			<hkparam name="variableBindingSet">#tkds$77</hkparam>
+			<hkparam name="userData">0</hkparam>
+			<hkparam name="name">TKDodgeForwardRight_ManualSelectorGenerator</hkparam>
+			<hkparam name="generators" numelements="4">
+				#tkds$38 #tkds$38 #tkds$76 #tkds$76
+			</hkparam>
+			<hkparam name="selectedGeneratorIndex">0</hkparam>
+			<hkparam name="currentGeneratorIndex">0</hkparam>
+		</hkobject>

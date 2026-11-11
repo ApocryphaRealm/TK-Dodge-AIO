@@ -1663,6 +1663,10 @@
 				<hkcstring>Animations\TKDodge\Stepdodgeforward.hkx</hkcstring>
 				<hkcstring>Animations\TKDodge\Stepdodgeleft.hkx</hkcstring>
 				<hkcstring>Animations\TKDodge\Stepdodgeright.hkx</hkcstring>
+				<hkcstring>Animations\TKDodge\StepDodgeForwardLeft.hkx</hkcstring>
+				<hkcstring>Animations\TKDodge\StepDodgeForwardRight.hkx</hkcstring>
+				<hkcstring>Animations\TKDodge\StepDodgeBackLeft.hkx</hkcstring>
+				<hkcstring>Animations\TKDodge\StepDodgeBackRight.hkx</hkcstring>
 <!-- CLOSE -->
 			</hkparam>
 			<hkparam name="animationFilenames" numelements="0"></hkparam>

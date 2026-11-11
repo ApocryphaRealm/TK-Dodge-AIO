@@ -107,6 +107,10 @@
 				<hkcstring>TKDR_IframeEnd</hkcstring>
 				<hkcstring>TKDR_DodgeStart</hkcstring>
 				<hkcstring>TKDR_DodgeEnd</hkcstring>
+				<hkcstring>TKDodgeForwardLeft</hkcstring>
+				<hkcstring>TKDodgeForwardRight</hkcstring>
+				<hkcstring>TKDodgeBackLeft</hkcstring>
+				<hkcstring>TKDodgeBackRight</hkcstring>
 <!-- CLOSE -->
 			</hkparam>
 			<hkparam name="attributeNames" numelements="0"></hkparam>

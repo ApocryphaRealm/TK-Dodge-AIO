@@ -472,6 +472,10 @@
 				<hkcstring>TKDodgeStop</hkcstring>
 				<hkcstring>TKDodgeRotation</hkcstring>
 				<hkcstring>Collision_Cancel</hkcstring>
+				<hkcstring>TKDodgeForwardLeft</hkcstring>
+				<hkcstring>TKDodgeForwardRight</hkcstring>
+				<hkcstring>TKDodgeBackLeft</hkcstring>
+				<hkcstring>TKDodgeBackRight</hkcstring>
 <!-- CLOSE -->
 			</hkparam>
 			<hkparam name="attributeNames" numelements="0"></hkparam>
