@@ -4,9 +4,9 @@
 # Needs ffmpeg on PATH. Run: py -3 make_previews.py        (rolls: py -3 make_previews.py rolls -> Roll_contact_sheet.png)
 import os, subprocess, glob, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROLLS = "rolls" in sys.argv[1:]
-DIRS = ["RollLeft", "RollRight", "RollForward", "RollBack"] if ROLLS else ["Left", "Right", "Forward", "Back"]
-SHEET = "Roll_contact_sheet.png" if ROLLS else "StepDodge_contact_sheet.png"
+ROLLS = "rolls" in sys.argv[1:]; UN = "Unarmed" if "unarmed" in sys.argv[1:] else ""
+DIRS = [d + UN for d in (["RollLeft", "RollRight", "RollForward", "RollBack"] if ROLLS else ["Left", "Right", "Forward", "Back"])]
+SHEET = ("Roll" if ROLLS else "StepDodge") + ("_unarmed" if UN else "") + "_contact_sheet.png"
 
 def ff(*args):
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *args], check=True)

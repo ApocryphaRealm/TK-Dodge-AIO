@@ -467,16 +467,20 @@ def roll_keys(n, a, b, c, d):
         tuck=[(0, 0), (a, 0), (b, 1), (c, 1), (d, 0), (e, 0)],
         turn=[(0, 0), (a + 1, 10), (b + 1, 100), ((b + c) / 2 + 1, 200), (c, 320), (d, 360), (e, 360)],
         lean=[(0, -2), (a, -18), (b, -25), (c, -22), (d, -10), (e, -2)],
-        spine_pitch=[(0, -3), (a, -18), (b, -60), (c, -60), (d, -18), (e, -3)],
+        spine_pitch=[(0, -3), (a, -18), (b, -80), (c, -80), (d, -18), (e, -3)],
         com_z=[(0, 64.5), (a, 51), (b, 38), (c, 38), (d, 49), (e, 64.5)],
         lag=[(0, 0), (a, -6), (b + 1, 4), (d, 0), (e, 0)],
         # the owner, 2026-11-11: "your arms go in between your legs with your head as you dive forward so that your
         # back hits the ground and you keep rolling with your weapon drawn" - both hands (weapon in hand) reach down
         # between the knees while tucked; the head tucks (neck_tuck / head_tuck below, chin to chest)
-        lh_dx=[(0, 0), (a, 2), (b, 5), (c, 5), (d, 1), (e, 0)], rh_dx=[(0, 0), (a, -2), (b, -5), (c, -5), (d, -1), (e, 0)],
-        lh_dy=[(0, 0), (a, 4), (b, 12), (c, 12), (d, 2), (e, 0)], rh_dy=[(0, 0), (a, 4), (b, 14), (c, 14), (d, 2), (e, 0)],
-        lh_dz=[(0, 0), (a, -8), (b, -24), (c, -24), (d, -6), (e, 0)], rh_dz=[(0, 0), (a, -8), (b, -22), (c, -22), (d, -6), (e, 0)],
-        neck_tuck=[(0, 0), (a, 8), (b, 30), (c, 30), (d, 6), (e, 0)], head_tuck=[(0, 0), (a, 5), (b, 22), (c, 22), (d, 4), (e, 0)],
+        lh_dx=[(0, 0), (a, 2), (b, 5), (c, 5), ((c + d) / 2, 0), (e, 0)], rh_dx=[(0, 0), (a, -2), (b, -5), (c, -5), ((c + d) / 2, 0), (e, 0)],
+        lh_dy=[(0, 0), (a, 4), (b, 12), (c, 12), ((c + d) / 2, 2), (d, 2), (e, 0)], rh_dy=[(0, 0), (a, 4), (b, 14), (c, 14), ((c + d) / 2, 2), (d, 2), (e, 0)],
+        # coming out the hands are already up, higher than the guard, then settle (the owner, 2026-11-11)
+        lh_dz=[(0, 0), (a, -8), (b, -24), (c, -24), ((c + d) / 2, 6), (d, 9), (e, 0)],
+        rh_dz=[(0, 0), (a, -8), (b, -22), (c, -22), ((c + d) / 2, 6), (d, 9), (e, 0)],
+        # head well tucked so the roll goes over the back - the head never touches the floor (the owner, 2026-11-11)
+        neck_tuck=[(0, 0), (a, 15), (b, 80), (c, 80), (d, 6), (e, 0)],
+        head_tuck=[(0, 0), (a, 12), (b, 60), (c, 60), (d, 4), (e, 0)],
     )
 ROLL_LEFT = Roll("RollLeft", "roll", -1, roll_keys(22, 2, 6, 15, 18))
 ROLL_RIGHT = Roll("RollRight", "roll", +1, roll_keys(22, 2, 6, 15, 18))
@@ -486,6 +490,14 @@ TUCK = {"L": Vector((-11.0, -4.0, -24.0)), "R": Vector((11.0, -4.0, -24.0))}   #
 
 DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK,
            "RollLeft": ROLL_LEFT, "RollRight": ROLL_RIGHT, "RollForward": ROLL_FORWARD, "RollBack": ROLL_BACK}
+# Unarmed variants: the same motion with open hands and the unarmed guard, written to unarmed\<file>.hkx; they
+# ship as the OAR submod "Simple Dodge\Unarmed" (both hands empty), so they replace the clips above only unarmed.
+import copy
+os.makedirs(os.path.join(OUT, "unarmed"), exist_ok=True)
+for _k in list(DESIGNS):
+    _u = copy.copy(DESIGNS[_k]); _u.unarmed = True
+    _u.name = _k + "Unarmed"; _u.file = os.path.join("unarmed", DESIGNS[_k].file)
+    DESIGNS[_u.name] = _u
 
 def ik2(s, t, l1, l2, pole):
     """Two-bone IK: joint position for root s, target t (clamped to reach), bending toward pole."""
@@ -521,13 +533,37 @@ def finger_setup():
             pts = [P0(x) for x in names]
             dirs = [(pts[1] - pts[0]), (pts[2] - pts[1]), (pts[2] - pts[1])]
             curl = (18, 28, 20) if fi == 0 else (55, 80, 50)
+            # unarmed: open hands, fingers extended with only a slight natural bend (the owner, 2026-11-11)
+            curl_open = (0, -5, -5) if fi == 0 else (-12, -22, -12)    # past the rest pose, which is half curled
             for j, nm in enumerate(names):
                 dd = dirs[j].normalized(); ax = dd.cross(n).normalized()
                 FINGERS[IDX[nm]] = Rax(ax, curl[j])
+                FINGERS_OPEN[IDX[nm]] = Rax(ax, curl_open[j])
+FINGERS_OPEN = {}
 finger_setup()
+# Unarmed guard (the owner, 2026-11-11): "the right hand to be closer to the body and the left to be slightly
+# outstretched" - right hand drawn in near the chest, left reaching forward, both open.
+# Amended the same day: "both hands raised but with the left in front of the right and both should have a 90 degree
+# angle bend at the elbow" - each hand sits at 0.707 of its arm's length from the shoulder (a right angle at the
+# elbow when upper arm and forearm are equal), the left pointing forward, the right turned in across the chest
+# so it rests behind the left (the 25-degree stance turn carries the right shoulder back as well).
+def _unarmed_guard(side, d):
+    s0 = P0(f"NPC {side} UpperArm [{side}Uar]"); e0 = P0(f"NPC {side} Forearm [{side}Lar]"); w0 = P0(f"NPC {side} Hand [{side}Hnd]")
+    l1, l2 = (e0 - s0).length, (w0 - e0).length
+    return s0 + Vector(d).normalized() * math.sqrt(l1 * l1 + l2 * l2)
+LH_GUARD_UNARMED = _unarmed_guard("L", (0.04, 0.96, 0.10))
+RH_GUARD_UNARMED = _unarmed_guard("R", (-0.08, 0.84, 0.32))
 
 # joints that must stay above the floor in a roll, with the clearance each needs (body thickness around the joint)
-CLEAR = (("Head", 9.0), ("Neck", 7.0), ("Spine", 8.0), ("Pelvis", 8.0), ("Clavicle", 7.0), ("UpperArm", 6.0),
+FOOT_YAW = {"L": 0.0, "R": -80.0}   # stance foot turn about Z, degrees (- turns the toes to the right)
+STANCE_YAW = -25.0     # hips and shoulders (right chest side pulled back) together, degrees about Z
+def head_crown(G):
+    """The top of the skull: 14 units up the head from the head joint (rest-pose up), carried by the head's rotation."""
+    i = IDX["NPC Head [Head]"]
+    return G[i].translation + (G[i].to_3x3() @ B0[i].transposed()) @ Vector((0.0, 2.0, 14.0))
+CROWN_CLEAR = 7.0
+# head joint (base of the skull) and neck joint (base of the neck, top of the back): the back of the neck may touch
+CLEAR = (("Head", 10.0), ("Neck", 6.0), ("Spine", 8.0), ("Pelvis", 8.0), ("Clavicle", 7.0), ("UpperArm", 6.0),
          ("Forearm", 4.5), ("Hand", 3.5), ("Thigh", 7.0), ("Calf", 5.0))
 def solve_pose(D, f):
     """World (root-local) 4x4 for every bone at frame f (0..NF-1). A roll is solved twice: the second time with the
@@ -535,6 +571,8 @@ def solve_pose(D, f):
     G, reach, feet = _solve_pose(D, f)
     if not D.roll: return G, reach, feet
     pen = 0.0
+    hi = IDX["NPC Head [Head]"]                  # the crown of the head must stay off the floor too (owner, 2026-11-11)
+    pen = max(pen, CROWN_CLEAR - head_crown(G).z)
     for i, n in enumerate(BN):
         if not n.startswith("NPC ") or "Root" in n: continue
         for key, c in CLEAR:
@@ -551,20 +589,30 @@ def _solve_pose(D, f, dz=0.0):
     com_pos = D.com_local(f)                                                 # root-local
     com_pos.z += dz
     w = D.v("tuck", f) if D.roll else 0.0
-    Rhip = Rax('Z', D.v("hip_yaw", f)) @ Rax('Y', D.v("hip_roll", f)) @ Rax('X', D.v("hip_pitch", f))
+    # staggered stance (left foot forward): hips and shoulders turn together so the right shoulder sits back over the
+    # right leg (the owner, 2026-11-11: "the hips and shoulder should match"); the head is held facing forward. The
+    # turn fades out while a roll is tucked. The spine counters only the clip's own hip_yaw, not this stance turn.
+    y0 = STANCE_YAW * (1 - w)
+    Rhip = Rax('Z', D.v("hip_yaw", f) + y0) @ Rax('Y', D.v("hip_roll", f)) @ Rax('X', D.v("hip_pitch", f))
     sr, sp, sy = D.v("spine_roll", f) / 3, D.v("spine_pitch", f) / 3, -0.8 * D.v("hip_yaw", f) / 3
     for nm in ("NPC Spine [Spn0]", "NPC Spine1 [Spn1]", "NPC Spine2 [Spn2]"):
         delta[IDX[nm]] = Rax('Z', sy) @ Rax('Y', sr) @ Rax('X', sp)
-    for i, R in FINGERS.items(): delta[i] = R
+    unarmed = getattr(D, "unarmed", False)
+    for i, R in (FINGERS_OPEN if unarmed else FINGERS).items(): delta[i] = R
     feet = {}
+    yaws = {}
     for side, pre in (("L", "lf"), ("R", "rf")):
         A = P0(f"NPC {side} Foot [{side}ft ]"); T = P0(f"NPC {side} Toe0 [{side}Toe]")
-        fwd = Vector(((T - A).x, (T - A).y, 0)).normalized(); lat = fwd.cross(Vector((0, 0, 1)))
-        heel_pt = A + Vector((0, 0, -A.z)) - fwd * 3.0           # back of the heel on the floor
         fx_, fy_, lift, p = D.foot(pre, f)
+        # foot turn (the owner, 2026-11-11): front (left) toes point where you face, the support (right) foot
+        # perpendicular; eased toward straight while the foot is in the air, and the knee follows the foot
+        Ry = Rax('Z', FOOT_YAW[side] * (1 - 0.6 * min(1.0, lift / 6.0))); yaws[side] = Ry
+        TA = Ry @ (T - A)
+        fwd = Vector((TA.x, TA.y, 0)).normalized(); lat = fwd.cross(Vector((0, 0, 1)))
+        heel_pt = A + Vector((0, 0, -A.z)) - fwd * 3.0           # back of the heel on the floor
         anchor = Vector((fx_ - RO.x, fy_ - RO.y, A.z))                     # flat-foot ankle position, root-local
-        Rf = Rax(lat, -p)
-        if p >= 0:   pivot = anchor + (T - A)                              # ball of the foot
+        Rf = Rax(lat, -p) @ Ry
+        if p >= 0:   pivot = anchor + TA                                   # ball of the foot
         else:        pivot = anchor + (heel_pt - A)
         ankle = pivot + Rf @ (anchor - pivot) + Vector((0, 0, lift))
         if w > 0:                                   # roll: the foot goes to its tucked point, turning with the body
@@ -590,7 +638,7 @@ def _solve_pose(D, f, dz=0.0):
                 s = G[i].translation
                 h0, k0, a0 = P0(BN[th]), P0(BN[ca]), P0(BN[fo])
                 l1, l2 = (k0 - h0).length, (a0 - k0).length
-                pole = Vector((0.25 if side == "R" else -0.25, 1, 0))
+                pole = yaws[side] @ Vector((0.25 if side == "R" else -0.25, 1, 0))
                 if D.roll: pole = Rhip @ pole                 # knees stay to the body's front as it turns
                 knee, ank, r = ik2(s, ankle, l1, l2, pole); reach[side] = r
                 Rt = chain_rot((k0 - h0).normalized(), (a0 - k0).normalized(), (knee - s).normalized(), (ank - knee).normalized())
@@ -607,7 +655,10 @@ def _solve_pose(D, f, dz=0.0):
             if i == ua:
                 ch = IDX["NPC Spine2 [Spn2]"]
                 pre = "lh" if side == "L" else "rh"
-                tgt_rest = (LH_GUARD if side == "L" else RH_GUARD) + Vector((D.v(pre + "_dx", f), D.v(pre + "_dy", f), D.v(pre + "_dz", f)))
+                base = (LH_GUARD if side == "L" else RH_GUARD)
+                if unarmed:   # in a roll's tuck the hands go between the knees as armed, so blend back by tuck
+                    base = (LH_GUARD_UNARMED if side == "L" else RH_GUARD_UNARMED).lerp(base, w)
+                tgt_rest = base + Vector((D.v(pre + "_dx", f), D.v(pre + "_dy", f), D.v(pre + "_dz", f)))
                 tgt = G[ch] @ (G0[ch].inverted() @ tgt_rest)
                 s = G[i].translation
                 s0, e0, w0 = P0(BN[ua]), P0(BN[fa]), P0(BN[ha])
