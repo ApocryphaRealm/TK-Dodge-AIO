@@ -261,7 +261,7 @@ def gait(pre, plants, lifts):
     srt = lambda d: sorted(d.items())
     return {pre + "_x": srt(X), pre + "_y": srt(Y), pre + "_lift": srt(L), pre + "_heel": srt(H)}
 
-LEFT = Design("Left", dict(
+LEFT_V1 = Design("Left", dict(
     # body (COM) offset from the capsule (+ = to the actor's right of the root). It holds still while the capsule
     # starts (anticipation), is thrown left by the push, leads a little while braking, and settles on the root.
     com_off_x=[(0, 0), (1, 11), (2, 21), (3, 29), (4, 32), (6, 22), (9, 2), (13, -12), (17, -9), (21, 0)],
@@ -288,7 +288,7 @@ LEFT = Design("Left", dict(
     rh_dx=[(0, 0), (5, 2), (10, 3), (15, 0), (21, 0)], rh_dz=[(0, 0), (5, -1), (12, -2), (21, 0)],
 ))
 
-RIGHT = Mirror("Right", LEFT)
+RIGHT_V1 = Mirror("Right", LEFT_V1)
 
 class Turned(Design):
     """The Left hop turned onto the fore-aft axis (the owner, 2026-11-11: forward and back must be one jump like left
@@ -331,7 +331,7 @@ class Turned(Design):
 # anticipation dip with the body held back, push off the rear (right) foot, a long low lunge onto the left,
 # two quick running steps with the trunk pitched forward, and a right-left catch-up into the stance.
 _FY = 409.283
-FORWARD = Design("Forward", dict(
+FORWARD_V0 = Design("Forward", dict(
     com_off_x=[(0, 0), (3, 2), (8, -3), (13, 3), (18, -3), (23, 1), (26, 0)],
     com_off_y=[(0, 0.5), (2, -9), (4, -13), (7, -6), (11, 3), (17, 8), (22, 6), (26, 0.5)],
     com_z=[(0, 64.5), (2, 60), (4, 61), (7, 57.5), (9, 59), (12, 57.5), (14, 59), (17, 57.5), (19, 59), (22, 58),
@@ -349,7 +349,7 @@ FORWARD = Design("Forward", dict(
 
 # Back: a hop-step backward - dip and lean in, push off the ball of the front (left) foot, low hop back onto the
 # right foot, the left catches up, the right steps back once more to brake, the left adjusts into the stance.
-BACK = Design("Back", dict(
+BACK_V0 = Design("Back", dict(
     com_off_x=[(0, 0), (10, 2), (16, -2), (21, 1), (24, 0)],
     com_off_y=[(0, 0.5), (2, 10), (4, 12), (7, 4), (11, -6), (16, -10), (20, -6), (24, 0.5)],
     com_z=[(0, 64.5), (2, 59.5), (4, 61.5), (7, 63.5), (10, 58), (13, 57), (17, 60), (21, 63), (24, 64.5)],
@@ -363,8 +363,76 @@ BACK = Design("Back", dict(
     **gait("rf", [(0, 2, 14, -5, 8), (9, 12, 12, -172, 20), (19, 24, 14, -305, 0)], [7, 6]),
 ))
 
-FORWARD = Turned("Forward", LEFT, +1)
-BACK = Turned("Back", LEFT, -1)
+# v1 (prototype-v1, tag anim-prototype-v1): Forward/Back were LEFT_V1 turned onto the fore-aft axis.
+FORWARD_V1 = Turned("Forward", LEFT_V1, +1)
+BACK_V1 = Turned("Back", LEFT_V1, -1)
+# ---- v2: step, bound, the other foot follows (the owner, 2026-11-11) -------------------------------------------
+# "if you're dodging right, then your right foot moves to the right, and then your left follows it soon after your
+# right touches down ... when I dodge forward, I kick off with my right foot, lift my left foot. Land with my left foot
+# forward, and my right foot that jumped off catches up to the left and hits the floor second."
+# A leg reaches only ~40 units from the body, so each clip is one bound: the lead foot lifts first, the push foot
+# kicks off a moment later, the lead foot lands at its end stance, then the push foot swings through and lands beside
+# it. Foot paths along the travel axis are given as explicit keys so each foot stays within reach of the body.
+def _feet(g, axis, lead, push):
+    """gait() for plants and lifts, then the travel-axis path of each foot replaced by explicit keys."""
+    out = {}
+    out.update(gait(lead[0], lead[1], lead[2])); out.update(gait(push[0], push[1], push[2]))
+    out[lead[0] + "_" + axis] = lead[3]; out[push[0] + "_" + axis] = push[3]
+    return out
+
+RIGHT = Design("Right", dict(
+    com_off_x=[(0, 0), (2, -14), (3, -24), (5, -14), (9, 0), (12, 12), (14, 15), (15, 16), (17, 16), (19, 8), (21, 0)],
+    com_off_y=[(0, 0.5), (21, 0.5)],
+    com_z=[(0, 64.5), (2, 58), (3, 55), (4, 58), (7, 64), (10, 66), (13, 63), (15, 58), (17, 55), (19, 59), (21, 64.5)],
+    hip_roll=[(0, 0), (2, 3), (4, 6), (8, 4), (12, 1), (15, -3), (18, -1), (21, 0)],      # + leans right
+    hip_pitch=[(0, -2), (3, -6), (7, -4), (12, -3), (16, -6), (19, -4), (21, -2)],
+    hip_yaw=[(0, 0), (3, 3), (9, -2), (15, 2), (21, 0)],
+    spine_roll=[(0, 0), (3, 2), (8, 3), (13, 0), (16, -2), (21, 0)],
+    spine_pitch=[(0, -3), (3, -7), (15, -6), (21, -3)],
+    lh_dx=[(0, 0), (4, -3), (10, 2), (16, 4), (21, 0)], lh_dz=[(0, 0), (5, 2), (13, -2), (21, 0)],
+    rh_dx=[(0, 0), (4, -3), (10, 2), (16, 4), (21, 0)], rh_dz=[(0, 0), (5, 2), (13, -2), (21, 0)],
+    **_feet(None, "x",
+        ("rf", [(0, 2, 14, -5, 6), (15, 21, 265.2, -5, 0)], [14],
+         [(0, 14), (2, 14), (5, 70), (9, 165), (12, 215), (14, 250), (15, 265.2), (21, 265.2)]),
+        ("lf", [(0, 3, -14, 4, 30), (19, 21, 237.2, 4, 0)], [12],
+         [(0, -14), (3, -14), (6, 45), (9, 100), (13, 180), (16, 222), (19, 237.2), (21, 237.2)])),
+))
+LEFT = Mirror("Left", RIGHT)
+
+_FY = 409.283
+FORWARD = Design("Forward", dict(
+    com_off_x=[(0, 0), (26, 0)],
+    com_off_y=[(0, 0.5), (2, -5), (4, -10), (7, -4), (11, 5), (15, 12), (17, 16), (20, 16), (23, 6), (26, 0.5)],
+    com_z=[(0, 64.5), (2, 60), (4, 56), (6, 60), (9, 65), (12, 68), (15, 66), (18, 61), (20, 57), (22, 55.5),
+           (24, 59), (26, 64.5)],
+    hip_pitch=[(0, -2), (3, -6), (6, -9), (11, -10), (17, -8), (20, -7), (23, -4), (26, -2)],
+    hip_roll=[(0, 0), (4, -2), (10, 1), (17, 2), (21, -1), (26, 0)],
+    hip_yaw=[(0, 0), (3, -3), (6, -6), (12, 2), (17, 5), (22, -2), (26, 0)],
+    spine_pitch=[(0, -3), (4, -7), (17, -8), (23, -5), (26, -3)],
+    lh_dy=[(0, 0), (6, 4), (14, -2), (20, 2), (26, 0)], rh_dy=[(0, 0), (6, -4), (14, 2), (20, -2), (26, 0)],
+    **_feet(None, "y",
+        ("lf", [(0, 2, -14, 4, 10), (20, 26, -14, _FY + 4, 0)], [14],
+         [(0, 4), (2, 4), (5, 45), (9, 150), (13, 260), (17, 355), (20, _FY + 4), (26, _FY + 4)]),
+        ("rf", [(0, 4, 14, -5, 30), (23, 26, 14, _FY - 5, 0)], [12],
+         [(0, -5), (4, -5), (7, 52), (11, 160), (15, 262), (19, 345), (23, _FY - 5), (26, _FY - 5)])),
+))
+
+BACK = Design("Back", dict(
+    com_off_x=[(0, 0), (24, 0)],
+    com_off_y=[(0, 0.5), (2, 6), (3, 10), (6, 2), (10, -8), (14, -10), (16, -12), (19, -8), (22, -3), (24, 0.5)],
+    com_z=[(0, 64.5), (2, 59), (3, 56), (5, 60), (8, 64), (11, 64.5), (14, 61), (16, 57), (18, 55.5), (21, 59),
+           (24, 64.5)],
+    hip_pitch=[(0, -2), (3, -6), (8, -3), (14, -4), (17, -7), (21, -4), (24, -2)],
+    hip_roll=[(0, 0), (5, 2), (12, -1), (18, 1), (24, 0)],
+    hip_yaw=[(0, 0), (3, 3), (9, -3), (16, 2), (24, 0)],
+    spine_pitch=[(0, -3), (3, -6), (8, -2), (17, -7), (24, -3)],
+    lh_dy=[(0, 0), (4, 4), (10, 2), (16, -1), (24, 0)], rh_dy=[(0, 0), (4, 4), (10, 2), (16, -1), (24, 0)],
+    **_feet(None, "y",
+        ("rf", [(0, 1, 14, -5, 6), (16, 24, 14, -305.0, 0)], [12],
+         [(0, -5), (1, -5), (4, -55), (8, -170), (12, -245), (16, -305.0), (24, -305.0)]),
+        ("lf", [(0, 3, -14, 4, 28), (21, 24, -14, -296.0, 0)], [10],
+         [(0, 4), (3, 4), (6, -55), (10, -140), (14, -215), (18, -270), (21, -296.0), (24, -296.0)])),
+))
 
 class Roll(Design):
     """A simple tucked roll: crouch, dive, one full turn (end over end for Forward/Back, sideways for Left/Right),
