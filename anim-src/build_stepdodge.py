@@ -492,6 +492,10 @@ DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK,
            "RollLeft": ROLL_LEFT, "RollRight": ROLL_RIGHT, "RollForward": ROLL_FORWARD, "RollBack": ROLL_BACK}
 # Unarmed variants: the same motion with open hands and the unarmed guard, written to unarmed\<file>.hkx; they
 # ship as the OAR submod "Simple Dodge\Unarmed" (both hands empty), so they replace the clips above only unarmed.
+# The owner, 2026-11-11: "the side to side dodges should have front facing feet only the front and back would have the
+# perpendicular feet" - left/right clips (step and roll) keep both feet pointing forward.
+for _d in (LEFT, RIGHT, ROLL_LEFT, ROLL_RIGHT):
+    _d.foot_yaw = {"L": 0.0, "R": 0.0}
 import copy
 os.makedirs(os.path.join(OUT, "unarmed"), exist_ok=True)
 for _k in list(DESIGNS):
@@ -606,7 +610,7 @@ def _solve_pose(D, f, dz=0.0):
         fx_, fy_, lift, p = D.foot(pre, f)
         # foot turn (the owner, 2026-11-11): front (left) toes point where you face, the support (right) foot
         # perpendicular; eased toward straight while the foot is in the air, and the knee follows the foot
-        Ry = Rax('Z', FOOT_YAW[side] * (1 - 0.6 * min(1.0, lift / 6.0))); yaws[side] = Ry
+        Ry = Rax('Z', getattr(D, "foot_yaw", FOOT_YAW)[side] * (1 - 0.6 * min(1.0, lift / 6.0))); yaws[side] = Ry
         TA = Ry @ (T - A)
         fwd = Vector((TA.x, TA.y, 0)).normalized(); lat = fwd.cross(Vector((0, 0, 1)))
         heel_pt = A + Vector((0, 0, -A.z)) - fwd * 3.0           # back of the heel on the floor
