@@ -484,9 +484,50 @@ def roll_keys(n, a, b, c, d):
     )
 ROLL_LEFT = Roll("RollLeft", "roll", -1, roll_keys(22, 2, 6, 15, 18))
 ROLL_RIGHT = Roll("RollRight", "roll", +1, roll_keys(22, 2, 6, 15, 18))
-ROLL_FORWARD = Roll("RollForward", "pitch", +1, roll_keys(27, 3, 7, 18, 22))
-ROLL_BACK = Roll("RollBack", "pitch", -1, roll_keys(25, 4, 8, 17, 21))
-TUCK = {"L": Vector((-11.0, -4.0, -24.0)), "R": Vector((11.0, -4.0, -24.0))}   # ankle offset from the COM, body frame
+def forward_roll_keys():
+    """The owner, 2026-11-11: "the roll dodges should not immediately go into a roll. It's more of diving forward with
+    your arms outstretched, but going between your legs. And by the time you stand up, your feet are already where they
+    should be." Crouch (0-3), dive forward with the arms reaching out ahead, body long, legs still pushing (3-8), the
+    head tucks and the arms go down between the legs (8-11), roll over the back (11-18), unroll onto feet already
+    planted in the end stance (18-22), stand (22-26). 27 frames (0.867 s, the clip's length)."""
+    return dict(
+        tuck=[(0, 0), (4, 0), (6, 0.4), (9, 0.85), (11, 1), (18, 1), (22, 0), (26, 0)],   # feet push off and leave early
+        turn=[(0, 0), (3, 5), (8, 55), (11, 105), (14, 200), (18, 320), (21, 360), (26, 360)],
+        lean=[(0, -2), (3, -15), (8, -10), (11, -15), (18, -20), (22, -10), (26, -2)],
+        spine_pitch=[(0, -3), (3, -12), (8, -15), (11, -70), (18, -80), (22, -18), (26, -3)],   # long in the dive
+        com_z=[(0, 64.5), (3, 52), (8, 44), (11, 36), (18, 36), (22, 49), (26, 64.5)],
+        lag=[(0, 0), (3, -6), (8, 12), (12, 4), (22, 0), (26, 0)],
+        # arms stretched out ahead in the dive, then down between the legs into the roll, then up high coming out
+        lh_dx=[(0, 0), (3, 2), (8, 4), (11, 5), (18, 5), (20, 0), (26, 0)], rh_dx=[(0, 0), (3, -2), (8, -4), (11, -5), (18, -5), (20, 0), (26, 0)],
+        lh_dy=[(0, 0), (3, 10), (8, 24), (11, 14), (18, 12), (20, 2), (22, 2), (26, 0)],
+        rh_dy=[(0, 0), (3, 10), (8, 24), (11, 16), (18, 14), (20, 2), (22, 2), (26, 0)],
+        lh_dz=[(0, 0), (3, -5), (8, -12), (11, -24), (18, -24), (20, 6), (22, 9), (26, 0)],
+        rh_dz=[(0, 0), (3, -5), (8, -12), (11, -22), (18, -22), (20, 6), (22, 9), (26, 0)],
+        neck_tuck=[(0, 0), (7, 5), (10, 45), (18, 45), (22, 6), (26, 0)],
+        head_tuck=[(0, 0), (7, 4), (10, 35), (18, 35), (22, 4), (26, 0)],
+    )
+ROLL_FORWARD = Roll("RollForward", "pitch", +1, forward_roll_keys())
+def back_roll_keys():
+    """A gymnastics backward roll, from the coaching notes the owner sent (2026-11-11): squat and roll onto the bottom
+    first with a rounded back; push through the heels, tuck the chin, bend the arms; hands by the ears, palms flat,
+    pushing the floor away so the weight comes off the neck; feet point behind, not to the ceiling; land on the feet
+    and stand. 25 frames (0.8 s, the clip's length)."""
+    return dict(
+        tuck=[(0, 0), (5, 0), (9, 1), (16, 1), (20, 0), (24, 0)],
+        turn=[(0, 0), (6, 5), (9, 60), (12, 150), (15, 250), (18, 330), (20, 360), (24, 360)],
+        lean=[(0, -2), (3, -15), (6, -20), (16, -20), (20, -12), (24, -2)],          # rounded back
+        spine_pitch=[(0, -3), (3, -20), (7, -55), (16, -60), (20, -20), (24, -3)],
+        com_z=[(0, 64.5), (3, 48), (6, 32), (9, 30), (16, 30), (20, 46), (24, 64.5)],  # squat, sit, roll, stand
+        lag=[(0, 0), (4, 4), (9, -4), (20, 0), (24, 0)],
+        # hands up by the ears, palms back, elbows bent - they meet the floor beside the head and push it away
+        lh_dx=[(0, 0), (3, -2), (6, -4), (17, -4), (20, 0), (24, 0)], rh_dx=[(0, 0), (3, 2), (6, 4), (17, 4), (20, 0), (24, 0)],
+        lh_dy=[(0, 0), (3, -8), (6, -16), (17, -16), (20, 2), (24, 0)], rh_dy=[(0, 0), (3, -7), (6, -14), (17, -14), (20, 2), (24, 0)],
+        lh_dz=[(0, 0), (3, 10), (6, 21), (17, 21), (20, 9), (24, 0)], rh_dz=[(0, 0), (3, 11), (6, 23), (17, 23), (20, 9), (24, 0)],
+        neck_tuck=[(0, 0), (4, 15), (8, 45), (16, 45), (20, 6), (24, 0)],          # chin tucked
+        head_tuck=[(0, 0), (4, 10), (8, 35), (16, 35), (20, 4), (24, 0)],
+    )
+ROLL_BACK = Roll("RollBack", "pitch", -1, back_roll_keys())
+TUCK = {"L": Vector((-7.0, -4.0, -24.0)), "R": Vector((7.0, -4.0, -24.0))}   # feet close together: knees do not splay (owner, 2026-11-11)   # ankle offset from the COM, body frame
 
 DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK,
            "RollLeft": ROLL_LEFT, "RollRight": ROLL_RIGHT, "RollForward": ROLL_FORWARD, "RollBack": ROLL_BACK}
@@ -706,7 +747,9 @@ def _solve_pose(D, f, dz=0.0):
                 h0, k0, a0 = P0(BN[th]), P0(BN[ca]), P0(BN[fo])
                 l1, l2 = (k0 - h0).length, (a0 - k0).length
                 pole = yaws[side] @ Vector((0.25 if side == "R" else -0.25, 1, 0))
-                if D.roll: pole = Rhip @ pole                 # knees stay to the body's front as it turns
+                if D.roll:            # knees aim straight at the chest as the body turns - not bent outwards (owner, 2026-11-11)
+                    wv = D.v("tuck", f)
+                    pole = Rhip @ Vector(((0.25 if side == "R" else -0.25) * (1 - wv), 1, 0))
                 knee, ank, r = ik2(s, ankle, l1, l2, pole); reach[side] = r
                 Rt = chain_rot((k0 - h0).normalized(), (a0 - k0).normalized(), (knee - s).normalized(), (ank - knee).normalized())
                 Rc = chain_rot((a0 - k0).normalized(), (k0 - h0).normalized() * -1, (ank - knee).normalized(), (knee - s).normalized() * -1)
