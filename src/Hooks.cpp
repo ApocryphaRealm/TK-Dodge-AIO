@@ -156,13 +156,20 @@ namespace Hooks
 
 	void Install()
 	{
+#if RUNTIME_LINE == 17
+		// Skyrim 1.7 put two new functions at slots 4 and 5 of every player input handler's vtable, so ProcessButton moved to
+		// slot 6; CommonLibSSE-NG 7.2 still names slot 4 (gate rule input-handler-vfunc-slot4-wrong-on-17, 2026-11-08).
+		constexpr std::size_t kProcessButtonSlot = 6;
+#else
+		constexpr std::size_t kProcessButtonSlot = 4;
+#endif
 		REL::Relocation<std::uintptr_t> sprintVtbl{ RE::VTABLE_SprintHandler[0] };
-		SprintHandlerHook::_original = sprintVtbl.write_vfunc(0x4, SprintHandlerHook::ProcessButton);
-		logger::info("Hook: SprintHandler::ProcessButton (vtable {:X} slot 0x4)", sprintVtbl.address());
+		SprintHandlerHook::_original = sprintVtbl.write_vfunc(kProcessButtonSlot, SprintHandlerHook::ProcessButton);
+		logger::info("Hook: SprintHandler::ProcessButton (vtable {:X} slot {})", sprintVtbl.address(), kProcessButtonSlot);
 
 		REL::Relocation<std::uintptr_t> sneakVtbl{ RE::VTABLE_SneakHandler[0] };
-		SneakHandlerHook::_original = sneakVtbl.write_vfunc(0x4, SneakHandlerHook::ProcessButton);
-		logger::info("Hook: SneakHandler::ProcessButton (vtable {:X} slot 0x4)", sneakVtbl.address());
+		SneakHandlerHook::_original = sneakVtbl.write_vfunc(kProcessButtonSlot, SneakHandlerHook::ProcessButton);
+		logger::info("Hook: SneakHandler::ProcessButton (vtable {:X} slot {})", sneakVtbl.address(), kProcessButtonSlot);
 
 		REL::Relocation<std::uintptr_t> playerVtbl{ RE::VTABLE_PlayerCharacter[0] };
 		PlayerUpdateLoop::_original = playerVtbl.write_vfunc(0xAD, PlayerUpdateLoop::PlayerUpdate);

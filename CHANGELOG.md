@@ -14,6 +14,7 @@ TK Dodge AIO keeps its own version line from 1.0.0. It is a fork of TK Dodge RE 
 - Picking the wrong build for your game now says so plainly: 'this build does not support Skyrim <version>; your Address Library is fine', and names the installer option to choose, instead of reporting a missing Address Library file.
 
 ### Fixed
+- Skyrim 1.7: the sprint-key and sneak-key dodges now fire (the button hooks used the pre-1.7 position).
 - Without the dodge behaviour in the animation graph (Nemesis / Pandora not run with TK Dodge), every press logged 'Already dodging'. The log now says once what is missing and to run Nemesis or Pandora.
 
 ## 1.0.2 - 2026-09-20 - untested
