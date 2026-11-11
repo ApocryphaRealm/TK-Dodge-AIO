@@ -492,6 +492,55 @@ DESIGNS = {"Left": LEFT, "Right": RIGHT, "Forward": FORWARD, "Back": BACK,
            "RollLeft": ROLL_LEFT, "RollRight": ROLL_RIGHT, "RollForward": ROLL_FORWARD, "RollBack": ROLL_BACK}
 # Unarmed variants: the same motion with open hands and the unarmed guard, written to unarmed\<file>.hkx; they
 # ship as the OAR submod "Simple Dodge\Unarmed" (both hands empty), so they replace the clips above only unarmed.
+# ---- 8-way: the four diagonals (the owner, 2026-11-11: "we can start making the diagonal 8-way dodges") -----------
+# Each diagonal is a side dodge laid onto a 45-degree axis: Forward-Left / Back-Left take LEFT's footwork (push off the
+# right, land on the left first), Forward-Right / Back-Right take RIGHT's (push off the left, land on the right) - the
+# push foot always lands second. Same timing as the side clip; travel scaled to the diagonal's distance; the side lean
+# split into roll and pitch along the axis. Our own clips only (TK Dodge replacers have no diagonals).
+DIAG = {  # name: (source, unit axis (x, y), travel units)
+    "ForwardLeft": ("Left", (-0.7071, 0.7071), 320.0), "ForwardRight": ("Right", (0.7071, 0.7071), 320.0),
+    "BackLeft": ("Left", (-0.7071, -0.7071), 280.0), "BackRight": ("Right", (0.7071, -0.7071), 280.0),
+}
+for _n, (_src, (_ux, _uy), _dist) in DIAG.items():
+    _S = SPEC[_src]; _tot = abs(_S["motion"][-1][1])
+    _mo = [(t, _ux * abs(x) / _tot * _dist, _uy * abs(x) / _tot * _dist) for t, x, y in _S["motion"]]
+    SPEC[_n] = dict(md=None, duration=_S["duration"], motion=_mo,
+                    ann=[(round(t, 4), "animmotion %s %s 0" % (_g(round(x, 3)), _g(round(y, 3)))) for t, x, y in _mo])
+
+class Diagonal(Design):
+    def __init__(self, name, src, axis):
+        super().__init__(name, {})
+        self.src = src; self.u = Vector((axis[0], axis[1], 0.0))
+        self.sgn = 1.0 if src.motion[-1][1] > 0 else -1.0      # +1 when the source travels to +x (Right)
+        self.k = abs(self.motion[-1][1] ** 2 + self.motion[-1][2] ** 2) ** 0.5 / abs(src.motion[-1][1])
+        self.foot_yaw = {"L": 0.0, "R": -45.0}                    # rear foot half-way between side and front/back
+    def v(self, name, f):
+        S = self.src
+        lean = S.v("hip_roll", f) * self.sgn                      # + = leaning toward the travel
+        slean = S.v("spine_roll", f) * self.sgn
+        if name == "hip_roll":    return lean * self.u.x
+        if name == "hip_pitch":   return S.v("hip_pitch", f) - lean * self.u.y
+        if name == "spine_roll":  return slean * self.u.x
+        if name == "spine_pitch": return S.v("spine_pitch", f) - slean * self.u.y
+        if name == "hip_yaw":     return S.v("hip_yaw", f) * self.sgn * (1 if self.u.y >= 0 else -1) * 0.5
+        return S.v(name, f)
+    def com_local(self, f):
+        S = self.src
+        w = (S.com_local(f) + S.root(f)).x * self.sgn * self.k   # body travel along the dodge axis
+        world = Vector((0.0, 0.5, 0.0)) + self.u * w
+        loc = world - self.root(f); loc.z = S.com_local(f).z
+        return loc
+    def foot(self, pre, f):
+        x, y, lift, heel = self.src.foot(pre, f)
+        x0 = self.src.foot(pre, 0)[0]
+        a = (x - x0) * self.sgn * self.k
+        sx, sy = (-12.0, 16.0) if pre == "lf" else (12.0, -16.0)
+        p = Vector((sx, sy, 0.0)) + self.u * a
+        return p.x, p.y, lift, heel
+
+for _n, (_src, _axis, _dist) in DIAG.items():
+    DESIGNS[_n] = Diagonal(_n, DESIGNS[_src], _axis)
+
 # The owner, 2026-11-11: "the side to side dodges should have front facing feet only the front and back would have the
 # perpendicular feet" - left/right clips (step and roll) keep both feet pointing forward.
 for _d in (LEFT, RIGHT, ROLL_LEFT, ROLL_RIGHT):
@@ -777,7 +826,8 @@ def build(D):
 def verify(D):
     out = {}
     ours = AS.load_skyrim_animation(os.path.join(OUT, f"{D.file}.hkx"))
-    ref = AS.load_skyrim_animation(D.ref)
+    # a diagonal has no reference clip (none exists in TK Dodge): compare it with itself, so the check still runs
+    ref = AS.load_skyrim_animation(D.ref) if os.path.exists(D.ref) else ours
     for nm, a in (("ours", ours), ("reference", ref)):
         out[nm] = dict(duration=round(a.duration, 4), frames=a.num_frames, fps=round(1 / a.frame_duration, 3),
                        tracks=a.num_tracks, blend_hint=a.blend_hint, skeleton_name=a.original_skeleton_name,
