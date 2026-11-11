@@ -185,7 +185,7 @@ namespace Menu
 			logger::warn("UI: the installed menu framework is too old for this page; update the Apocrypha Menu Framework");
 			return;
 		}
-		SKSEMenuFramework::SetSection("TK Dodge AIO");
+		SKSEMenuFramework::SetSection("Simple Dodge");  // the menu shows this name (owner, 2026-11-11: the mod is "Simple Dodge")
 		SKSEMenuFramework::AddSectionItem("Settings", Settings::RenderSettings);
 		SKSEMenuFramework::AddInputEvent(Settings::OnInput);
 		logger::info("UI: settings page registered with the menu framework");
