@@ -9,8 +9,12 @@ import build_stepdodge as B
 from mathutils import Matrix, Vector
 from math import radians
 
-ARMOR_DIR = r"D:\Modlists\Njordlinger\mods\unpublished Nordic Ebony Armor and Weapons Replacer\meshes\armor\ebony\m"
-PIECES = [os.path.join(B.BODY_DIR, "malebody_1.nif")] + [os.path.join(ARMOR_DIR, n) for n in
+# Vanilla Steel Armor (the owner, 2026-11-11: "Don't do Nordic Ebony, since we don't own its assets. Just do a vanilla
+# armor set."), unpacked from Skyrim - Meshes0.bsa / Skyrim - Textures2.bsa into _showcase_assets (git-ignored -
+# Bethesda's files are never committed).
+ARMOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_showcase_assets", "meshes", "armor", "steel")
+# vanilla pieces only: the steel cuirass and gauntlets carry their own body and hand parts (no third-party body mesh)
+PIECES = [os.path.join(ARMOR_DIR, n) for n in
           ("cuirass_1.nif", "boots_1.nif", "gauntlets_1.nif", "helmet_1.nif")]
 W, H = 720, 480
 
@@ -34,6 +38,13 @@ def dress(arma):
                 imgs = [n.image.name for mat in o.data.materials if mat and mat.use_nodes
                         for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image]
                 B.say("dressed", os.path.basename(nif), o.name, "textures:", imgs[:3])
+                if not any(bpy.data.images[i].has_data or bpy.data.images[i].size[0] for i in imgs):
+                    skin = bpy.data.materials.get("Skin") or bpy.data.materials.new("Skin")
+                    skin.diffuse_color = (0.62, 0.47, 0.38, 1)
+                    if skin.node_tree and "Principled BSDF" in skin.node_tree.nodes:
+                        skin.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.62, 0.47, 0.38, 1)
+                        skin.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.6
+                    o.data.materials.clear(); o.data.materials.append(skin)   # no skin texture loaded: plain skin tone
         for o in new:
             if o.type == 'ARMATURE': bpy.data.objects.remove(o)
             elif o.type == 'EMPTY' and not o.children: bpy.data.objects.remove(o)

@@ -10,3 +10,5 @@ anim-src/_frames/
 anim-src/_log_*.txt
 anim-src/_preview_scene.blend
 anim-src/_verify.json
+anim-src/_showcase_assets/
+anim-src/_showcase/
