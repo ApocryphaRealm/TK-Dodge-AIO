@@ -555,8 +555,22 @@ def _unarmed_guard(side, d):
     s0 = P0(f"NPC {side} UpperArm [{side}Uar]"); e0 = P0(f"NPC {side} Forearm [{side}Lar]"); w0 = P0(f"NPC {side} Hand [{side}Hnd]")
     l1, l2 = (e0 - s0).length, (w0 - e0).length
     return s0 + Vector(d).normalized() * math.sqrt(l1 * l1 + l2 * l2)
-LH_GUARD_UNARMED = _unarmed_guard("L", (0.04, 0.96, 0.10))
-RH_GUARD_UNARMED = _unarmed_guard("R", (-0.08, 0.84, 0.32))
+# Amended again: "both hands should be at cheek level, but the left arm should be out further than the right. So keep
+# the left arm where it's at, so it maintains its angle, but raise it up to cheek height and pull the right arm back
+# closer to the face." Left: same reach (right angle at the elbow), its direction tipped up until the hand is at cheek
+# height. Right: a hand's width in front of the right cheek, elbow folded tighter.
+_HEAD = P0("NPC Head [Head]"); CHEEK_Z = _HEAD.z + 3.0
+def _left_at_cheek():
+    s0 = P0("NPC L UpperArm [LUar]"); e0 = P0("NPC L Forearm [LLar]"); w0 = P0("NPC L Hand [LHnd]")
+    L = math.sqrt((e0 - s0).length ** 2 + (w0 - e0).length ** 2)
+    dz = max(-L, min(L, CHEEK_Z - s0.z)); hz = math.sqrt(max(0.0, L * L - dz * dz))
+    h = Vector((0.04, 0.96, 0.0)).normalized() * hz
+    return s0 + Vector((h.x, h.y, dz))
+# Given in the chest's rest frame, chosen so that after the 25-degree stance turn the left hand sits in front of the
+# left cheek, further out (world about x -8, y +22), and the right hand beside the right cheek (world about x +10, y +6).
+CHEEK_Z = _HEAD.z - 1.0     # the WRIST, so the palm sits at cheek height
+LH_GUARD_UNARMED = Vector((-16.6, 16.6, CHEEK_Z))
+RH_GUARD_UNARMED = Vector((6.5, 9.7, CHEEK_Z))
 
 # joints that must stay above the floor in a roll, with the clearance each needs (body thickness around the joint)
 FOOT_YAW = {"L": 0.0, "R": -80.0}   # stance foot turn about Z, degrees (- turns the toes to the right)
@@ -668,6 +682,8 @@ def _solve_pose(D, f, dz=0.0):
                 s0, e0, w0 = P0(BN[ua]), P0(BN[fa]), P0(BN[ha])
                 l1, l2 = (e0 - s0).length, (w0 - e0).length
                 pole_rest = Vector((-1 if side == "L" else 1, -0.3, -1.2))
+                if unarmed:          # elbows kept down under a raised open guard, not flared out to the side
+                    pole_rest = Vector((-0.5 if side == "L" else 0.5, -0.4, -1.6))
                 pole = G[ch].to_3x3() @ B0[ch].transposed() @ pole_rest
                 el, wr, r = ik2(s, tgt, l1, l2, pole); reach["arm" + side] = r
                 Ru = chain_rot((e0 - s0).normalized(), (w0 - e0).normalized(), (el - s).normalized(), (wr - el).normalized())
