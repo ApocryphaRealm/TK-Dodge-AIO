@@ -1,0 +1,9 @@
+		<hkobject name="#tkds$57" class="hkbModifierList" signature="0xa4180ca1">
+			<hkparam name="variableBindingSet">null</hkparam>
+			<hkparam name="userData">1</hkparam>
+			<hkparam name="name">tkdodgeModifierList</hkparam>
+			<hkparam name="enable">true</hkparam>
+			<hkparam name="modifiers" numelements="5">
+				#tkds$56 #tkds$54 #tkds$51 #tkds$48 #tkds$45
+			</hkparam>
+		</hkobject>
