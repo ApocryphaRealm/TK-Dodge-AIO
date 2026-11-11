@@ -467,11 +467,16 @@ def roll_keys(n, a, b, c, d):
         tuck=[(0, 0), (a, 0), (b, 1), (c, 1), (d, 0), (e, 0)],
         turn=[(0, 0), (a + 1, 10), (b + 1, 100), ((b + c) / 2 + 1, 200), (c, 320), (d, 360), (e, 360)],
         lean=[(0, -2), (a, -18), (b, -25), (c, -22), (d, -10), (e, -2)],
-        spine_pitch=[(0, -3), (a, -15), (b, -45), (c, -45), (d, -15), (e, -3)],
+        spine_pitch=[(0, -3), (a, -18), (b, -60), (c, -60), (d, -18), (e, -3)],
         com_z=[(0, 64.5), (a, 51), (b, 38), (c, 38), (d, 49), (e, 64.5)],
         lag=[(0, 0), (a, -6), (b + 1, 4), (d, 0), (e, 0)],
-        lh_dz=[(0, 0), (b, -8), (c, -8), (d, 0), (e, 0)], rh_dz=[(0, 0), (b, -8), (c, -8), (d, 0), (e, 0)],
-        lh_dy=[(0, 0), (b, -4), (c, -4), (d, 0), (e, 0)], rh_dy=[(0, 0), (b, -4), (c, -4), (d, 0), (e, 0)],
+        # the owner, 2026-11-11: "your arms go in between your legs with your head as you dive forward so that your
+        # back hits the ground and you keep rolling with your weapon drawn" - both hands (weapon in hand) reach down
+        # between the knees while tucked; the head tucks (neck_tuck / head_tuck below, chin to chest)
+        lh_dx=[(0, 0), (a, 2), (b, 5), (c, 5), (d, 1), (e, 0)], rh_dx=[(0, 0), (a, -2), (b, -5), (c, -5), (d, -1), (e, 0)],
+        lh_dy=[(0, 0), (a, 4), (b, 8), (c, 8), (d, 2), (e, 0)], rh_dy=[(0, 0), (a, 4), (b, 10), (c, 10), (d, 2), (e, 0)],
+        lh_dz=[(0, 0), (a, -10), (b, -32), (c, -32), (d, -8), (e, 0)], rh_dz=[(0, 0), (a, -10), (b, -30), (c, -30), (d, -8), (e, 0)],
+        neck_tuck=[(0, 0), (a, 8), (b, 30), (c, 30), (d, 6), (e, 0)], head_tuck=[(0, 0), (a, 5), (b, 22), (c, 22), (d, 4), (e, 0)],
     )
 ROLL_LEFT = Roll("RollLeft", "roll", -1, roll_keys(22, 2, 6, 15, 18))
 ROLL_RIGHT = Roll("RollRight", "roll", +1, roll_keys(22, 2, 6, 15, 18))
@@ -618,10 +623,13 @@ def _solve_pose(D, f, dz=0.0):
         if name == "NPC Neck [Neck]":
             acc = (G[par].to_3x3() @ B0[par].transposed()).to_quaternion()
             Rn = acc.slerp(Quaternion(), 0.5 * (1 - w)).to_matrix()      # in a roll the head follows the body
+            if D.roll: Rn = Rn @ Rax('X', -D.v("neck_tuck", f))            # ... and tucks, chin to chest
             G[i] = Matrix.Translation(G[i].translation) @ (Rn @ B0[i]).to_4x4()
         if name == "NPC Head [Head]":
             acc = (G[i].to_3x3() @ B0[i].transposed()).to_quaternion()
-            G[i] = Matrix.Translation(G[i].translation) @ (acc.slerp(Quaternion(), 1 - w).to_matrix() @ B0[i]).to_4x4()
+            Rh = acc.slerp(Quaternion(), 1 - w).to_matrix()
+            if D.roll: Rh = Rh @ Rax('X', -D.v("head_tuck", f))
+            G[i] = Matrix.Translation(G[i].translation) @ (Rh @ B0[i]).to_4x4()
     return G, reach, feet
 
 # ------------------------------------------------------------------------------------------------ build stage
